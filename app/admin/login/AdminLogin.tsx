@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AdminLogin() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const from = searchParams.get("from") || "/admin/overview";
+  const [redirectFrom, setRedirectFrom] = useState<string>("/admin/overview");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setRedirectFrom(params.get("from") || "/admin/overview");
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +37,7 @@ export default function AdminLogin() {
         return;
       }
 
-      router.push(data.redirect || from);
+      router.push(data.redirect || redirectFrom);
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
