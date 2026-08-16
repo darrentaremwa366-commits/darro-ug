@@ -6,17 +6,18 @@ export const config = {
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const hasSession = req.cookies.has('darro_admin_session');
 
   if (pathname === '/admin/login' || pathname.startsWith('/api/auth/')) {
     return NextResponse.next();
   }
 
   if (pathname.startsWith('/api/admin/')) {
+    const hasSession = req.cookies.has('darro_admin_session');
     if (!hasSession) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.next();
   }
 
+  const hasSession = req.cookies.has('darro_admin_session');
   if (!hasSession) {
     const loginUrl = new URL('/admin/login', req.url);
     loginUrl.searchParams.set('from', pathname);
