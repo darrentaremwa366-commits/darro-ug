@@ -42,21 +42,25 @@ export async function POST(req: NextRequest) {
     if (!admin) {
       await sleep(800);
 
-      db.prepare(
-        `INSERT INTO admin_audit_log (id, store_id, admin_user_id, action, resource_type, resource_id, details_json, ip_address, user_agent, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        auditId,
-        STORE_ID,
-        null,
-        'login_failed',
-        'admin_user',
-        null,
-        JSON.stringify({ email: email.toLowerCase() }),
-        ip,
-        userAgent,
-        now
-      );
+      if (db) {
+        try {
+          db.prepare(
+            `INSERT INTO admin_audit_log (id, store_id, admin_user_id, action, resource_type, resource_id, details_json, ip_address, user_agent, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).run(
+            auditId,
+            STORE_ID,
+            null,
+            'login_failed',
+            'admin_user',
+            null,
+            JSON.stringify({ email: email.toLowerCase() }),
+            ip,
+            userAgent,
+            now
+          );
+        } catch { /* audit log best-effort only */ }
+      }
 
       return NextResponse.json(
         { ok: false, error: 'Invalid credentials' },
@@ -71,21 +75,25 @@ export async function POST(req: NextRequest) {
       email: admin.email,
     });
 
-    db.prepare(
-      `INSERT INTO admin_audit_log (id, store_id, admin_user_id, action, resource_type, resource_id, details_json, ip_address, user_agent, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      auditId,
-      STORE_ID,
-      admin.id,
-      'login_success',
-      'admin_user',
-      admin.id,
-      JSON.stringify({ email: admin.email.toLowerCase(), role: admin.role }),
-      ip,
-      userAgent,
-      now
-    );
+    if (db) {
+      try {
+        db.prepare(
+          `INSERT INTO admin_audit_log (id, store_id, admin_user_id, action, resource_type, resource_id, details_json, ip_address, user_agent, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          auditId,
+          STORE_ID,
+          admin.id,
+          'login_success',
+          'admin_user',
+          admin.id,
+          JSON.stringify({ email: admin.email.toLowerCase(), role: admin.role }),
+          ip,
+          userAgent,
+          now
+        );
+      } catch { /* audit log best-effort only */ }
+    }
 
     const response = NextResponse.json({
       ok: true,

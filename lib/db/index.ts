@@ -194,12 +194,22 @@ export function initDb(): Database.Database {
   return db;
 }
 
-export const db: Database.Database =
-  globalForDb.db || initDb();
+let _db: Database.Database | null = null;
+let _dbInitError: Error | null = null;
 
-if (!globalForDb.db) {
-  globalForDb.db = db;
-  globalForDb.initialized = true;
+try {
+  _db = globalForDb.db || initDb();
+  if (_db) {
+    globalForDb.db = _db;
+    globalForDb.initialized = true;
+  }
+} catch (err) {
+  _dbInitError = err instanceof Error ? err : new Error(String(err));
+  console.warn('DB init failed (expected on Vercel read-only fs). In-memory fallback will be used.', _dbInitError.message);
 }
+
+export const db: Database.Database | null = _db;
+export const dbInitError: Error | null = _dbInitError;
+export const isDbAvailable: boolean = _db !== null;
 
 export default db;

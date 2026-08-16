@@ -90,6 +90,26 @@ export async function verifyAdminLogin(
 ): Promise<AdminUserRow | null> {
   const normalizedEmail = email.trim().toLowerCase();
 
+  const envPassword = process.env.ADMIN_PASSWORD;
+  if (envPassword && password === envPassword) {
+    const envEmail = process.env.ADMIN_EMAIL || 'owner@darro.co';
+    if (normalizedEmail === envEmail.toLowerCase()) {
+      return {
+        id: 'admin_env',
+        store_id: STORE_ID,
+        email: envEmail,
+        password_hash: '',
+        role: 'owner',
+        full_name: 'Darro Owner',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    }
+    return null;
+  }
+
+  if (!db) return null;
+
   const row = db
     .prepare(
       `SELECT * FROM admin_users WHERE store_id = ? AND LOWER(email) = ?`
