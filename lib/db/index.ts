@@ -67,17 +67,145 @@ export interface SeedProductsItem {
 
 function loadProductsFromDisk(): SeedProductsItem[] {
   try {
-    const productsJsonPath = path.join(getProjectRoot(), 'data', 'products.json');
+    const root = getProjectRoot();
+    const productsJsonPath = path.join(root, 'data', 'products.json');
     if (fs.existsSync(productsJsonPath)) {
       return JSON.parse(fs.readFileSync(productsJsonPath, 'utf-8'));
     }
-  } catch {}
+  } catch (e) {
+    console.warn('[db] loadProductsFromDisk failed:', e instanceof Error ? e.message : String(e));
+  }
   return [];
 }
 
+const _IN_MEMORY_SCHEMA_FALLBACK = `
+CREATE TABLE IF NOT EXISTS stores (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  timezone TEXT NOT NULL DEFAULT 'Africa/Kampala',
+  currency TEXT NOT NULL DEFAULT 'UGX',
+  settings_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_users (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'staff',
+  full_name TEXT,
+  last_login_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(store_id, email)
+);
+CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL,
+  external_id TEXT,
+  slug TEXT NOT NULL,
+  name TEXT NOT NULL,
+  sku TEXT,
+  collection TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  regular_price_cents INTEGER NOT NULL,
+  member_price_cents INTEGER,
+  cogs_cents INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(store_id, slug)
+);
+CREATE TABLE IF NOT EXISTS orders (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL,
+  order_number TEXT NOT NULL,
+  customer_name TEXT,
+  customer_email TEXT,
+  customer_phone TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  total_cents INTEGER NOT NULL,
+  items_json TEXT NOT NULL,
+  shipping_address_json TEXT,
+  notes TEXT,
+  checkout_channel TEXT NOT NULL DEFAULT 'whatsapp',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS visitors (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  country TEXT,
+  city TEXT,
+  device_type TEXT,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  referrer_host TEXT
+);
+CREATE TABLE IF NOT EXISTS events (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL,
+  visitor_id TEXT,
+  session_id TEXT,
+  event_type TEXT NOT NULL,
+  path TEXT,
+  product_id TEXT,
+  order_id TEXT,
+  revenue_cents INTEGER,
+  referrer TEXT,
+  user_agent TEXT,
+  ip_address TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL,
+  admin_user_id TEXT,
+  action TEXT NOT NULL,
+  resource_type TEXT,
+  resource_id TEXT,
+  details_json TEXT,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaigns (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft',
+  audience_size INTEGER NOT NULL DEFAULT 0,
+  budget_cents INTEGER,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  target_date TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_events_store_created ON events(store_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_store_created ON orders(store_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_products_store_active ON products(store_id, active);
+CREATE INDEX IF NOT EXISTS idx_visitors_store_first ON visitors(store_id, first_seen_at);
+`;
+
 function loadSchemaFromDisk(): string {
-  const schemaPath = path.join(getProjectRoot(), 'lib', 'db', 'schema.sql');
-  return fs.readFileSync(schemaPath, 'utf-8');
+  try {
+    const root = getProjectRoot();
+    const schemaPath = path.join(root, 'lib', 'db', 'schema.sql');
+    if (fs.existsSync(schemaPath)) {
+      return fs.readFileSync(schemaPath, 'utf-8');
+    }
+  } catch (e) {
+    console.warn('[db] loadSchemaFromDisk failed, using embedded fallback schema:', e instanceof Error ? e.message : String(e));
+  }
+  return _IN_MEMORY_SCHEMA_FALLBACK;
 }
 
 // ---------- Better-SQLite3 local DB (dev / fallback) ----------
@@ -159,8 +287,17 @@ try {
   _syncDb = globalForSqlite.db || initSqliteFile();
 } catch (err) {
   _dbInitError = err instanceof Error ? err : new Error(String(err));
-  console.warn('[db] SQLite file init failed, using in-memory fallback (this is expected on Vercel read-only fs).', _dbInitError.message);
-  _syncDb = initSqliteMemory();
+  console.warn('[db] SQLite file init failed, trying in-memory fallback (Vercel read-only fs?).', _dbInitError.message);
+  try {
+    _syncDb = initSqliteMemory();
+  } catch (err2) {
+    const msg = err2 instanceof Error ? err2.message : String(err2);
+    console.error('[db] In-memory SQLite init ALSO failed — creating truly empty stub. Error:', msg);
+    // Last-resort: create a bare :memory: DB without applying schema/seed.
+    // Any queries that need tables will fail gracefully later; queryDb falls back.
+    _syncDb = new Database(':memory:');
+    _dbInitError = new Error('DB degraded (no schema/seed): ' + msg);
+  }
 }
 export const db: Database.Database = _syncDb;
 export const dbInitError: Error | null = _dbInitError;
