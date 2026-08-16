@@ -194,22 +194,120 @@ export function initDb(): Database.Database {
   return db;
 }
 
-let _db: Database.Database | null = null;
+function initInMemoryDb(): Database.Database {
+  const memDb = new Database(':memory:');
+  memDb.pragma('foreign_keys = ON');
+
+  const schemaPath = path.join(getProjectRoot(), 'lib', 'db', 'schema.sql');
+  const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
+  memDb.exec(schemaSql);
+
+  const now = nowISO();
+
+  memDb.prepare(
+    `INSERT INTO stores (id, name, slug, timezone, currency, settings_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    STORE_ID,
+    'Darro',
+    'darro',
+    'Africa/Kampala',
+    'UGX',
+    JSON.stringify({}),
+    now,
+    now
+  );
+
+  const passwordHash = bcryptjs.hashSync('darro2026', 10);
+  memDb.prepare(
+    `INSERT INTO admin_users (id, store_id, email, password_hash, role, full_name, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    'admin_owner',
+    STORE_ID,
+    'owner@darro.co',
+    passwordHash,
+    'owner',
+    'Darro Owner',
+    now,
+    now
+  );
+
+  const productsJsonPath = path.join(getProjectRoot(), 'data', 'products.json');
+  if (fs.existsSync(productsJsonPath)) {
+    const productsRaw = fs.readFileSync(productsJsonPath, 'utf-8');
+    const products = JSON.parse(productsRaw) as Array<{
+      id: number;
+      slug: string;
+      name: string;
+      collection?: string;
+      sku?: string;
+      regularPriceUGX: number;
+      memberPriceUGX?: number;
+      stockStatus?: string;
+    }>;
+
+    const upsertProduct = memDb.prepare(
+      `INSERT INTO products (id, store_id, external_id, slug, name, sku, collection, active,
+                              regular_price_cents, member_price_cents, cogs_cents, created_at, updated_at)
+       VALUES (@id, @store_id, @external_id, @slug, @name, @sku, @collection, @active,
+               @regular_price_cents, @member_price_cents, @cogs_cents, @created_at, @updated_at)
+       ON CONFLICT(store_id, slug) DO UPDATE SET
+         name = excluded.name,
+         sku = excluded.sku,
+         collection = excluded.collection,
+         active = excluded.active,
+         regular_price_cents = excluded.regular_price_cents,
+         member_price_cents = excluded.member_price_cents,
+         cogs_cents = excluded.cogs_cents,
+         updated_at = excluded.updated_at`
+    );
+
+    const tx = memDb.transaction((prods: typeof products) => {
+      for (const p of prods) {
+        const cogsCents = Math.floor(p.regularPriceUGX * 0.45);
+        const active = p.stockStatus === 'soldOut' ? 0 : 1;
+        upsertProduct.run({
+          id: `prod_${p.slug}`,
+          store_id: STORE_ID,
+          external_id: String(p.id),
+          slug: p.slug,
+          name: p.name,
+          sku: p.sku || `DRR-P${String(p.id).padStart(3, '0')}`,
+          collection: p.collection || null,
+          active,
+          regular_price_cents: p.regularPriceUGX,
+          member_price_cents: p.memberPriceUGX || null,
+          cogs_cents: cogsCents,
+          created_at: now,
+          updated_at: now,
+        });
+      }
+    });
+
+    tx(products);
+  }
+
+  return memDb;
+}
+
+let _db: Database.Database;
 let _dbInitError: Error | null = null;
 
 try {
   _db = globalForDb.db || initDb();
-  if (_db) {
-    globalForDb.db = _db;
-    globalForDb.initialized = true;
-  }
+  globalForDb.db = _db;
+  globalForDb.initialized = true;
 } catch (err) {
   _dbInitError = err instanceof Error ? err : new Error(String(err));
-  console.warn('DB init failed (expected on Vercel read-only fs). In-memory fallback will be used.', _dbInitError.message);
+  console.warn('DB file init failed (expected on Vercel read-only fs). Falling back to in-memory DB.', _dbInitError.message);
+  _db = initInMemoryDb();
+  globalForDb.db = _db;
+  globalForDb.initialized = true;
 }
 
-export const db: Database.Database | null = _db;
+export const db: Database.Database = _db;
 export const dbInitError: Error | null = _dbInitError;
-export const isDbAvailable: boolean = _db !== null;
+export const isDbAvailable: boolean = true;
 
 export default db;

@@ -108,8 +108,6 @@ export async function verifyAdminLogin(
     return null;
   }
 
-  if (!db) return null;
-
   const row = db
     .prepare(
       `SELECT * FROM admin_users WHERE store_id = ? AND LOWER(email) = ?`
