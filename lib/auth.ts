@@ -1,0 +1,112 @@
+import { SignJWT, jwtVerify } from 'jose';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import bcryptjs from 'bcryptjs';
+import db, { STORE_ID, nowISO, uuid } from '@/lib/db';
+
+export const JWT_SECRET: string =
+  process.env.ADMIN_JWT_SECRET ||
+  'darro-dev-secret-change-me-please-32chars-min';
+
+export const SESSION_COOKIE = 'darro_admin_session';
+
+export interface AdminSessionPayload {
+  adminId: string;
+  storeId: string;
+  role: string;
+  email: string;
+  [key: string]: unknown;
+}
+
+export async function signAdminSession(
+  payload: AdminSessionPayload
+): Promise<string> {
+  const secret = new TextEncoder().encode(JWT_SECRET);
+  const jwt = await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('24h')
+    .sign(secret);
+  return jwt;
+}
+
+export async function verifyAdminSession(
+  token: string
+): Promise<AdminSessionPayload | null> {
+  try {
+    const secret = new TextEncoder().encode(JWT_SECRET);
+    const { payload } = await jwtVerify(token, secret);
+    return {
+      adminId: payload.adminId as string,
+      storeId: payload.storeId as string,
+      role: payload.role as string,
+      email: payload.email as string,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function setSessionCookie(
+  response: NextResponse,
+  token: string
+): NextResponse {
+  response.cookies.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24,
+  });
+  return response;
+}
+
+export function clearSessionCookie(response: NextResponse): NextResponse {
+  response.cookies.set(SESSION_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+    expires: new Date(0),
+  });
+  return response;
+}
+
+export interface AdminUserRow {
+  id: string;
+  store_id: string;
+  email: string;
+  password_hash: string;
+  role: string;
+  full_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function verifyAdminLogin(
+  email: string,
+  password: string
+): Promise<AdminUserRow | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const row = db
+    .prepare(
+      `SELECT * FROM admin_users WHERE store_id = ? AND LOWER(email) = ?`
+    )
+    .get(STORE_ID, normalizedEmail) as AdminUserRow | undefined;
+
+  if (!row) return null;
+
+  const valid = bcryptjs.compareSync(password, row.password_hash);
+  if (!valid) return null;
+
+  return row;
+}
+
+export async function getAdminUserFromRequest(): Promise<AdminSessionPayload | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  return verifyAdminSession(token);
+}

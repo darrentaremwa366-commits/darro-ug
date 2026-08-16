@@ -1,0 +1,27 @@
+{
+  "bundles": [
+    {
+      "id": "bundle-1",
+      "name": "New Season + World Cup Bundle",
+      "description": "Buy any Premier League or La Liga jersey, receive a World Cup jersey FREE.",
+      "active": true,
+      "triggerLeague": ["Premier League", "La Liga"],
+      "freeProductCategory": "World Cup",
+      "tagline": "🔥 Limited Bundle Offer"
+    },
+    {
+      "id": "bundle-2",
+      "name": "Bundle & Save",
+      "description": "Buy 2 jerseys and automatically save UGX 5,000.",
+      "active": true,
+      "minQuantity": 2,
+      "discountUGX": 5000,
+      "tagline": "Bundle & Save"
+    }
+  ],
+  "productBadges": [
+    "Daro Club Price Available",
+    "New Drop",
+    "Limited Stock"
+  ]
+}

@@ -1,0 +1,408 @@
+[
+    {
+        "id":  1,
+        "slug":  "man-utd-home-2026",
+        "name":  "Manchester United Home 2026/27",
+        "team":  "Manchester United",
+        "league":  "Premier League",
+        "collection":  "2026/27",
+        "season":  "2026/27",
+        "category":  "Home Kit",
+        "description":  "Classic red home jersey with subtle geometric pattern. Celebrating the club\u0027s legacy with modern performance fabric. Snapdragon sponsor, Adidas three-stripe, iconic club crest.",
+        "material":  "100% Recycled Polyester, AEROREADY technology",
+        "fitInfo":  "Regular fit, true to size. Model 180cm wears size L.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL",
+                               "XXL"
+                           ],
+        "stockStatus":  "inStock",
+        "images":  [
+                       "/images/products/man-utd-home-2026/front.jpg",
+                       "/images/products/man-utd-home-2026/back.jpg"
+                   ],
+        "isBestSeller":  true,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "arsenal-home-2026",
+                                "man-city-home-2026",
+                                "chelsea-home-2026"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  2,
+        "slug":  "arsenal-home-2026",
+        "name":  "Arsenal Home 2026/27",
+        "team":  "Arsenal",
+        "league":  "Premier League",
+        "collection":  "2026/27",
+        "season":  "2026/27",
+        "category":  "Home Kit",
+        "description":  "Iconic red and white Arsenal home jersey. Crafted with sustainable materials and lightning crest details. Emirates Fly Better sponsor, Adidas logo.",
+        "material":  "100% Recycled Polyester, HEAT.RDY technology",
+        "fitInfo":  "Regular fit. True to European sizing.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL",
+                               "XXL"
+                           ],
+        "stockStatus":  "inStock",
+        "images":  [
+                       "/images/products/arsenal-home-2026/front.jpg",
+                       "/images/products/arsenal-home-2026/back.jpg",
+                       "/images/products/arsenal-home-2026/detail.jpg"
+                   ],
+        "isBestSeller":  true,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "man-utd-home-2026",
+                                "chelsea-home-2026",
+                                "real-madrid-home-2026"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  3,
+        "slug":  "man-city-home-2026",
+        "name":  "Manchester City Home 2026/27",
+        "team":  "Manchester City",
+        "league":  "Premier League",
+        "collection":  "2026/27",
+        "season":  "2026/27",
+        "category":  "Home Kit",
+        "description":  "Sky blue champions edition jersey with Etihad Airways sponsor. Premium moisture-wicking fabric and classic club crest.",
+        "material":  "100% Recycled Polyester, Dri-FIT ADV",
+        "fitInfo":  "Slim athletic fit. Consider sizing up for relaxed wear.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL"
+                           ],
+        "stockStatus":  "soldOut",
+        "images":  [
+                       "/images/products/man-city-home-2026/front.jpg",
+                       "/images/products/man-city-home-2026/back.jpg",
+                       "/images/products/man-city-home-2026/detail.jpg"
+                   ],
+        "isBestSeller":  false,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "man-utd-home-2026",
+                                "arsenal-home-2026",
+                                "real-madrid-home-2026"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  4,
+        "slug":  "chelsea-home-2026",
+        "name":  "Chelsea Home 2026/27",
+        "team":  "Chelsea FC",
+        "league":  "Premier League",
+        "collection":  "2026/27",
+        "season":  "2026/27",
+        "category":  "Home Kit",
+        "description":  "Chelsea blue with all-over heritage graphic print. Three Chelsea Foundation sponsor logo and club crest on chest.",
+        "material":  "100% Recycled Polyester, adidas AEROREADY",
+        "fitInfo":  "Regular fit. True to size.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL",
+                               "XXL"
+                           ],
+        "stockStatus":  "soldOut",
+        "images":  [
+                       "/images/products/chelsea-home-2026/front.jpg",
+                       "/images/products/chelsea-home-2026/back.jpg",
+                       "/images/products/chelsea-home-2026/detail.jpg"
+                   ],
+        "isBestSeller":  false,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "man-city-home-2026",
+                                "arsenal-home-2026",
+                                "man-utd-home-2026"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  5,
+        "slug":  "real-madrid-home-2026",
+        "name":  "Real Madrid Home 2026/27",
+        "team":  "Real Madrid",
+        "league":  "La Liga",
+        "collection":  "2026/27",
+        "season":  "2026/27",
+        "category":  "Home Kit",
+        "description":  "Real Madrid\u0027s legendary all-white home kit. Gold accents on club crest and Adidas logo. Emirates sponsor.",
+        "material":  "100% Recycled Polyester, HEAT.RDY Elite",
+        "fitInfo":  "Slim fit. Size up for casual wear.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL",
+                               "XXL"
+                           ],
+        "stockStatus":  "soldOut",
+        "images":  [
+                       "/images/products/real-madrid-home-2026/front.jpg",
+                       "/images/products/real-madrid-home-2026/back.jpg",
+                       "/images/products/real-madrid-home-2026/detail.jpg"
+                   ],
+        "isBestSeller":  true,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "argentina-world-cup",
+                                "portugal-world-cup",
+                                "man-utd-home-2026"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  6,
+        "slug":  "argentina-world-cup",
+        "name":  "Argentina World Cup Champions",
+        "team":  "Argentina",
+        "league":  "World Cup",
+        "collection":  "World Cup",
+        "season":  "2022/26",
+        "category":  "Home Kit",
+        "description":  "World Cup winning Argentina jersey with 3-star crest. Qatar 2022 champions edition. Iconic sky blue and white stripes.",
+        "material":  "100% Recycled Polyester, Adidas HEAT.RDY",
+        "fitInfo":  "Slim fit. Size up for layering.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL",
+                               "XXL"
+                           ],
+        "stockStatus":  "soldOut",
+        "images":  [
+                       "/images/products/argentina-world-cup/front.jpg",
+                       "/images/products/argentina-world-cup/back.jpg",
+                       "/images/products/argentina-world-cup/detail.jpg"
+                   ],
+        "isBestSeller":  true,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "england-world-cup",
+                                "man-utd-home-2026",
+                                "arsenal-home-2026"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  7,
+        "slug":  "england-world-cup",
+        "name":  "England World Cup Home",
+        "team":  "England",
+        "league":  "World Cup",
+        "collection":  "World Cup",
+        "season":  "2026",
+        "category":  "Home Kit",
+        "description":  "England Three Lions classic white home jersey. FA crest with star above for 1966 glory. Modern performance fabric.",
+        "material":  "100% Recycled Polyester, Nike Dri-FIT ADV",
+        "fitInfo":  "Regular fit. True to size.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL",
+                               "XXL"
+                           ],
+        "stockStatus":  "soldOut",
+        "images":  [
+                       "/images/products/england-world-cup/front.jpg",
+                       "/images/products/england-world-cup/back.jpg",
+                       "/images/products/england-world-cup/detail.jpg"
+                   ],
+        "isBestSeller":  false,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "argentina-world-cup",
+                                "spain-world-cup",
+                                "portugal-world-cup"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  8,
+        "slug":  "spain-world-cup",
+        "name":  "Spain World Cup Home",
+        "team":  "Spain",
+        "league":  "World Cup",
+        "collection":  "World Cup",
+        "season":  "2026",
+        "category":  "Home Kit",
+        "description":  "La Roja iconic red jersey with 2010 World Cup champion details. RFEF crest and traditional yellow trim accents.",
+        "material":  "100% Recycled Polyester, Adidas AEROREADY",
+        "fitInfo":  "Regular fit, slightly tailored through the torso.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL",
+                               "XXL"
+                           ],
+        "stockStatus":  "soldOut",
+        "images":  [
+                       "/images/products/spain-world-cup/front.jpg",
+                       "/images/products/spain-world-cup/back.jpg",
+                       "/images/products/spain-world-cup/detail.jpg"
+                   ],
+        "isBestSeller":  false,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "argentina-world-cup",
+                                "portugal-world-cup",
+                                "japan-world-cup"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  9,
+        "slug":  "portugal-world-cup",
+        "name":  "Portugal World Cup Home",
+        "team":  "Portugal",
+        "league":  "World Cup",
+        "collection":  "World Cup",
+        "season":  "2026",
+        "category":  "Home Kit",
+        "description":  "Seleção das Quinas classic deep red home. Portugal FA crest with gold detailing and bold diagonal stripe accent. Puma performance fabric.",
+        "material":  "100% Recycled Polyester, Puma ULTRAWEAVE",
+        "fitInfo":  "Standard fit. Runs slightly athletic.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL",
+                               "XXL"
+                           ],
+        "stockStatus":  "soldOut",
+        "images":  [
+                       "/images/products/portugal-world-cup/front.jpg",
+                       "/images/products/portugal-world-cup/back.jpg",
+                       "/images/products/portugal-world-cup/detail.jpg"
+                   ],
+        "isBestSeller":  true,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "argentina-world-cup",
+                                "spain-world-cup",
+                                "england-world-cup"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    },
+    {
+        "id":  10,
+        "slug":  "japan-world-cup",
+        "name":  "Japan World Cup Home",
+        "team":  "Japan",
+        "league":  "World Cup",
+        "collection":  "World Cup",
+        "season":  "2026",
+        "category":  "Home Kit",
+        "description":  "Samurai Blue iconic navy jersey with origami pattern and cherry blossom details. JFA crest and Y-3 inspired design details.",
+        "material":  "100% Recycled Polyester, Y-3 HEAT.RDY",
+        "fitInfo":  "Slim cut, Japanese sizing. Size up for comfort.",
+        "regularPriceUGX":  65000,
+        "memberPriceUGX":  60000,
+        "sizesAvailable":  [
+                               "S",
+                               "M",
+                               "L",
+                               "XL"
+                           ],
+        "stockStatus":  "soldOut",
+        "images":  [
+                       "/images/products/japan-world-cup/front.jpg",
+                       "/images/products/japan-world-cup/detail.jpg"
+                   ],
+        "isBestSeller":  false,
+        "unitsSold":  0,
+        "reviewsCount":  0,
+        "avgRating":  0,
+        "customizationAvailable":  true,
+        "relatedProducts":  [
+                                "spain-world-cup",
+                                "england-world-cup",
+                                "real-madrid-home-2026"
+                            ],
+        "sizesInStock":  [
+                             "M"
+                         ]
+    }
+]

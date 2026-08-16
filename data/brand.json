@@ -1,0 +1,46 @@
+{
+  "name": "Darro",
+  "tagline": "The World of the Builder",
+  "shortDescription": "Premium football jerseys for those who put in the work. Quiet discipline. Earned belonging.",
+  "worldValues": [
+    "Early mornings",
+    "Quiet discipline",
+    "Training + study",
+    "Faith without noise",
+    "Small circles",
+    "Repetition",
+    "Progress unseen"
+  ],
+  "contact": {
+    "whatsapp": "+86 158 1740 4017",
+    "whatsappGroup": "https://chat.whatsapp.com/F2CQD00DWPU7m4buAcXwH3?s=cl&p=a&ilr=1",
+    "email": "hello@darro.co",
+    "address": "Makerere, Kampala, Uganda",
+    "country": "Uganda 🇺🇬"
+  },
+  "social": {
+    "instagram": "https://www.instagram.com/darro.clo/",
+    "tiktok": ""
+  },
+  "club": {
+    "name": "Darro Club",
+    "headline": "Join Uganda's football jersey community",
+    "benefits": [
+      "Exclusive member prices",
+      "Early access to new drops",
+      "Limited offers",
+      "Special bundles",
+      "Free delivery around Makerere University"
+    ],
+    "freeDeliveryZone": "Makerere University",
+    "consentText": "By joining Darro Club you consent to receive recurring automated promotional and personalized marketing messages about new drops only. Consent is not a condition of any purchase."
+  },
+  "delivery": {
+    "zones": [
+      "Nationwide delivery across Uganda"
+    ],
+    "freeZone": "Free delivery around Makerere University",
+    "timeline": "3-5 working days after order confirmation via WhatsApp",
+    "feeNote": "Delivery fees apply based on location"
+  }
+}

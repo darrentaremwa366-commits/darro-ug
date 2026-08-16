@@ -1,0 +1,192 @@
+[
+  {
+    "id": "builder-v1-classic",
+    "name": "The Classic Builder",
+    "headline": "Quiet confidence. Studio lighting.",
+    "description": "Your signature everyday avatar. Warm Darro studio (bone-brown backdrop), arms folded. The one you'll use for 80% of product shoots.",
+    "tags": ["signature", "studio", "folded-arms"],
+    "skinTone": "deep-warm-brown",
+    "hair": {
+      "style": "short-textured-faded-cuts",
+      "color": "black-soft-waves",
+      "detail": "light-stubble-no-full-beard"
+    },
+    "face": {
+      "expression": "calm-slight-smolder-not-smiling",
+      "eyes": "dark-brown-focused",
+      "jawline": "defined-soft"
+    },
+    "body": {
+      "pose": "arms-folded-across-chest-relaxed",
+      "build": "athletic-lean-not-bulky",
+      "height": "180cm-proportions"
+    },
+    "wardrobeBase": "plain-black-oversized-tshirt-white-sneakers",
+    "background": {
+      "style": "warm-studio",
+      "color": "bone-to-sand-gradient",
+      "surface": "textured-tile-floor-brown-tone",
+      "lighting": "soft-golden-hour-window-from-left",
+      "aesthetic": "minimal-no-props"
+    },
+    "camera": {
+      "shot": "medium-full-body-3-4",
+      "lens": "50mm-prime",
+      "angle": "eye-level",
+      "filmLook": "fuji-provia-400h-soft-grain"
+    },
+    "promptSeed": "cinematic full-body studio photograph, dark-skinned Black man approximately 24 years old, short textured faded haircut with soft waves, light stubble, calm confident smoldering expression not smiling, dark brown eyes, defined soft jawline, athletic lean build, arms folded loosely across chest relaxed posture, wearing plain black oversized t-shirt and white low-top sneakers, warm Darro studio with bone-to-sand gradient backdrop, brown textured tile floor, soft golden hour window light from left side, 50mm prime lens eye-level, Fuji Provia 400H color grading, very subtle film grain, premium fashion editorial photography, hyperrealistic skin texture, 8k"
+  },
+  {
+    "id": "builder-v2-sunrise-rooftop",
+    "name": "Sunrise Builder",
+    "headline": "Early morning. The World of the Builder.",
+    "description": "Storytelling avatar for the hero section and social reels. Rooftop at 6am, Kampala skyline soft in the background. Matches the 'quiet discipline / early mornings' brand value.",
+    "tags": ["lifestyle", "sunrise", "storytelling", "hero"],
+    "skinTone": "deep-warm-brown",
+    "hair": {
+      "style": "short-textured-faded-cuts",
+      "color": "black-soft-waves",
+      "detail": "fresh-line-up"
+    },
+    "face": {
+      "expression": "thoughtful-gazing-off-camera-slight-smile",
+      "eyes": "dark-brown-warm",
+      "jawline": "defined-soft"
+    },
+    "body": {
+      "pose": "one-hand-in-pocket-other-resting-on-railing",
+      "build": "athletic-lean",
+      "height": "180cm-proportions"
+    },
+    "wardrobeBase": "darro-heather-grey-hoodie-black-joggers-white-new-balance-990s",
+    "background": {
+      "style": "rooftop-sunrise",
+      "color": "soft-peach-sky-hazy-purple-horizon",
+      "surface": "concrete-rooftop-slightly-worn",
+      "lighting": "first-sun-rays-warm-backlight-soft-rim-light-on-hair",
+      "aesthetic": "builders-quiet-morning-empire-state-of-mind"
+    },
+    "camera": {
+      "shot": "medium-3-4-slight-low-angle",
+      "lens": "35mm-prime",
+      "angle": "slightly-low",
+      "filmLook": "fuji-superia-400-warm-pastel-sky"
+    },
+    "promptSeed": "cinematic lifestyle photograph, sunrise rooftop at 6am, dark-skinned Black man 24 years old, short textured faded hair fresh line-up, thoughtful expression gazing off camera with faint smile, one hand in jogger pocket other resting lightly on metal railing, wearing heather grey hoodie, black tapered joggers, white New Balance 990 sneakers, soft peach sunrise sky with hazy purple horizon, Kampala-style distant low-rise skyline silhouette, first warm sun rays creating soft rim light on hair and shoulders, 35mm prime lens slightly low angle, Fuji Superia 400 film look with warm pastel sky, subtle grain, premium streetwear editorial, hyperrealistic, 8k"
+  },
+  {
+    "id": "builder-v3-product-shot-athlete",
+    "name": "Jersey Product Avatar",
+    "headline": "Wearing the jersey. Front & back shots.",
+    "description": "The workhorse avatar. You'll composite every new jersey onto this exact pose/lighting so every product has a 'worn by Builder' look. Shoot it once, swap jerseys forever.",
+    "tags": ["product", "jersey", "compositing", "front", "back"],
+    "skinTone": "deep-warm-brown",
+    "hair": {
+      "style": "short-textured-faded-cuts",
+      "color": "black-soft-waves",
+      "detail": "clean-line-up"
+    },
+    "face": {
+      "expression": "neutral-confident-slight-smolder",
+      "eyes": "direct-eye-contact",
+      "jawline": "defined"
+    },
+    "body": {
+      "pose": "standing-straight-arms-relaxed-at-sides-neutral-front",
+      "build": "athletic-lean-wide-shoulders",
+      "height": "182cm-proportions"
+    },
+    "wardrobeBase": "WEARING-JERSEY-TO-SWAP — this template is designed so you paste the jersey product flat onto the torso. Plain black shorts, white socks, white football boots.",
+    "background": {
+      "style": "seamless-studio",
+      "color": "darro-bone-beige-solid-matches-product-tiles",
+      "surface": "same-bone-beige-slight-shadow-at-feet",
+      "lighting": "even-soft-studio-3-point-lighting-no-harsh-shadows-on-jersey",
+      "aesthetic": "ecommerce-catalog-perfect-for-product-page-4th-slot"
+    },
+    "camera": {
+      "shot": "full-body-head-to-toe-front",
+      "lens": "85mm-prime-minimal-distortion",
+      "angle": "eye-level-straight-on",
+      "filmLook": "canon-5d-mark-iv-clean-editorial-neutral-white-balance"
+    },
+    "promptSeed": "clean full-body studio catalog photograph, head to toe straight on eye-level front view, dark-skinned Black man 25 years old, short textured faded haircut clean line-up, neutral confident smolder expression direct eye contact, athletic lean wide shoulders, standing straight arms relaxed at sides, wearing football jersey (jersey area left neutral for compositing), plain black athletic shorts, white crew socks, white leather football boots, seamless Darro bone-beige studio backdrop matching product tiles, soft even 3-point lighting with zero harsh shadows on torso for clean jersey compositing, subtle drop shadow at feet, 85mm prime lens minimal distortion, Canon 5D Mark IV crisp editorial neutral white balance, hyperrealistic skin, absolutely no text or logos on jersey area, 8k"
+  },
+  {
+    "id": "builder-v4-social-reel-closeup",
+    "name": "Reel / Social Close-up",
+    "headline": "For Instagram carousels and TikTok thumbnails.",
+    "description": "Tighter crop, more personality. Used when the product is already established and you want to sell the feeling/lifestyle behind it.",
+    "tags": ["social", "closeup", "personality", "reels"],
+    "skinTone": "deep-warm-brown",
+    "hair": {
+      "style": "slightly-longer-textured-waves-slight-curl",
+      "color": "black",
+      "detail": "light-stubble-mid-day-stubble"
+    },
+    "face": {
+      "expression": "half-smile-relaxed-almost-laughing-genuine",
+      "eyes": "crinkled-at-corners-warm",
+      "jawline": "defined"
+    },
+    "body": {
+      "pose": "leaning-against-brown-tile-wall-one-shoulder-weight",
+      "build": "athletic-lean",
+      "height": "cropped-waist-up"
+    },
+    "wardrobeBase": "wearing-product-jersey-cropped-showing-shield-crest-and-sponsor",
+    "background": {
+      "style": "outdoor-brown-tile-wall-midday-african-sun",
+      "color": "warm-terracotta-brown-tiles",
+      "surface": "matte-textured-wall-tiles",
+      "lighting": "hard-bright-midday-sun-casting-sharp-but-softened-shadows",
+      "aesthetic": "ugandan-street-football-vibe-authentic"
+    },
+    "camera": {
+      "shot": "waist-up-3-4-tight-crop",
+      "lens": "50mm-prime",
+      "angle": "eye-level",
+      "filmLook": "kodak-portra-400-warm-skin-tones-slight-grain"
+    },
+    "promptSeed": "authentic waist-up photograph, 3/4 tight crop, dark-skinned Black man 24 years old, slightly longer textured wavy hair with a light curl, midday light stubble, genuine half-smile eyes crinkled at corners almost laughing, leaning shoulder against warm terracotta brown matte tile wall, wearing a football jersey cropped to show club crest and sponsor chest area clearly, hard bright midday African sun casting sharp but softened shadows, Kodak Portra 400 color grade with warm skin tones and very slight film grain, authentic Ugandan street football vibe, 50mm prime eye-level, hyperrealistic detailed skin pores and hair texture, 8k"
+  },
+  {
+    "id": "builder-v5-long-hair-alt",
+    "name": "Long Hair Builder (Alt)",
+    "headline": "If you want more hair / locs personality.",
+    "description": "Alternative persona if short-fade doesn't feel like 'you'. Shoulder-length twisted locs, more artistic vibe. Keep or discard — it's iteration #5 for choice.",
+    "tags": ["alt", "locs", "personality", "option"],
+    "skinTone": "deep-warm-brown",
+    "hair": {
+      "style": "shoulder-length-thin-twisted-locs-half-tied-back",
+      "color": "black-with-brown-highlights-from-sun",
+      "detail": "beard-stubble-light"
+    },
+    "face": {
+      "expression": "confident-smirk-head-slightly-tilted",
+      "eyes": "dark-brown",
+      "jawline": "angular"
+    },
+    "body": {
+      "pose": "seated-on-studio-stool-one-leg-crossed-over-other",
+      "build": "athletic-lean",
+      "height": "180cm"
+    },
+    "wardrobeBase": "oversized-cream-linen-shirt-unbuttoned-over-white-tank-top-wide-leg-trousers",
+    "background": {
+      "style": "loft-studio",
+      "color": "warm-white-and-exposed-brick",
+      "surface": "parquet-floor",
+      "lighting": "soft-north-facing-window-light",
+      "aesthetic": "architect-designer-vibe"
+    },
+    "camera": {
+      "shot": "medium-full-seated",
+      "lens": "50mm",
+      "angle": "eye-level",
+      "filmLook": "fuji-400h-grain"
+    },
+    "promptSeed": "cinematic medium full seated studio portrait, dark-skinned Black man 25 years old, shoulder length thin twisted locs half tied back with a black leather tie, sun-kissed brown highlights in hair, light stubble beard, confident slight smirk head slightly tilted, angular jawline, athletic lean build seated on low wooden studio stool one leg crossed casually, wearing oversized cream linen shirt unbuttoned over white ribbed tank top, wide leg soft charcoal trousers, exposed warm red brick wall with warm white painted loft backdrop, herringbone parquet wood floor, soft diffused north-facing window light, Fuji 400H film look subtle grain, architecture-designer creative vibe, 50mm prime lens eye-level, hyperrealistic, 8k"
+  }
+]
