@@ -280,29 +280,51 @@ function seedSqlite(db: Database.Database): void {
   }
 }
 
-// Resolve which sync db to export for backwards-compat code
-let _syncDb: Database.Database;
+// Resolve which sync db to export for backwards-compat code.
+// IMPORTANT: fully lazy — do NOT touch better-sqlite3 at module-eval time.
+// This avoids Vercel build crashes during static prerender (pages that don't
+// actually need the DB never trigger native binding load).
+let _syncDb: Database.Database | null = null;
 let _dbInitError: Error | null = null;
-try {
-  _syncDb = globalForSqlite.db || initSqliteFile();
-} catch (err) {
-  _dbInitError = err instanceof Error ? err : new Error(String(err));
-  console.warn('[db] SQLite file init failed, trying in-memory fallback (Vercel read-only fs?).', _dbInitError.message);
-  try {
-    _syncDb = initSqliteMemory();
-  } catch (err2) {
-    const msg = err2 instanceof Error ? err2.message : String(err2);
-    console.error('[db] In-memory SQLite init ALSO failed — creating truly empty stub. Error:', msg);
-    // Last-resort: create a bare :memory: DB without applying schema/seed.
-    // Any queries that need tables will fail gracefully later; queryDb falls back.
-    _syncDb = new Database(':memory:');
-    _dbInitError = new Error('DB degraded (no schema/seed): ' + msg);
+let _initAttempted = false;
+
+function getSyncDb(): Database.Database {
+  if (_syncDb) return _syncDb;
+  if (globalForSqlite.db && globalForSqlite.initialized) {
+    _syncDb = globalForSqlite.db;
+    return _syncDb;
   }
+  if (_initAttempted && _syncDb) return _syncDb;
+  _initAttempted = true;
+  try {
+    _syncDb = initSqliteFile();
+  } catch (err) {
+    _dbInitError = err instanceof Error ? err : new Error(String(err));
+    console.warn('[db] SQLite file init failed, trying in-memory fallback (Vercel read-only fs?).', _dbInitError.message);
+    try {
+      _syncDb = initSqliteMemory();
+    } catch (err2) {
+      const msg = err2 instanceof Error ? err2.message : String(err2);
+      console.error('[db] In-memory SQLite init ALSO failed — creating truly empty stub. Error:', msg);
+      _syncDb = new Database(':memory:');
+      _dbInitError = new Error('DB degraded (no schema/seed): ' + msg);
+    }
+  }
+  return _syncDb!;
 }
-export const db: Database.Database = _syncDb;
+
+// Lazy proxy: forwards to getSyncDb() on first property access during runtime queries.
+// This keeps existing callers working (db.prepare etc) without touching native init at import time.
+export const db: Database.Database = new Proxy({} as Database.Database, {
+  get(_target, prop, _receiver) {
+    const real = getSyncDb();
+    const val = (real as unknown as Record<string | symbol, unknown>)[prop as string | symbol];
+    return typeof val === 'function' ? (val as (...args: unknown[]) => unknown).bind(real) : val;
+  },
+});
 export const dbInitError: Error | null = _dbInitError;
 export const isDbAvailable = true;
-export function initDb(): void { /* no-op: init happens lazily via queryDb / _syncDb */ }
+export function initDb(): void { /* no-op: init happens lazily via queryDb / getSyncDb */ }
 export default db;
 
 // ---------- Turso (persistent remote DB) + Async unified layer ----------
@@ -476,7 +498,7 @@ async function resolveBackend(): Promise<DbBackend> {
   }
 
   // Fall back to local sync SQLite wrapped in async interface
-  const backend = new SqliteBackend(_syncDb);
+  const backend = new SqliteBackend(getSyncDb());
   globalForBackend.backend = backend;
   return backend;
 }
