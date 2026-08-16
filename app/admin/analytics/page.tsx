@@ -21,10 +21,12 @@ export default async function AdminAnalytics({
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
 
-  const kpis = getOverviewKpis();
-  const funnel = getFunnel();
-  const products = getProductStats({ topN: 10 });
-  const traffic = getTrafficSources();
+  const [kpis, funnel, products, traffic] = await Promise.all([
+    getOverviewKpis(),
+    getFunnel(),
+    getProductStats({ topN: 10 }),
+    getTrafficSources(),
+  ]);
 
   const funnelMax = Math.max(...funnel.steps.map((s) => s.value), 1);
 

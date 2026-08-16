@@ -25,12 +25,14 @@ export default async function AdminOverview() {
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
 
-  const kpis = getOverviewKpis();
-  const timeline = getSalesTimeline({ granularity: "day" });
-  const traffic = getTrafficSources();
-  const revenueByCol = getRevenueByCollection();
-  const topPages = getTopPages({ limit: 10 });
-  const funnel = getFunnel();
+  const [kpis, timeline, traffic, revenueByCol, topPages, funnel] = await Promise.all([
+    getOverviewKpis(),
+    getSalesTimeline({ granularity: "day" }),
+    getTrafficSources(),
+    getRevenueByCollection(),
+    getTopPages({ limit: 10 }),
+    getFunnel(),
+  ]);
 
   const maxRevenue = Math.max(...timeline.map((d) => d.revenue), 1);
   const maxVisits = Math.max(...timeline.map((d) => d.visits), 1);

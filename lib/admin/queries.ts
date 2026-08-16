@@ -1,4 +1,4 @@
-import db, { STORE_ID, uuid, nowISO } from '@/lib/db';
+import { queryDb, STORE_ID, uuid, nowISO } from '@/lib/db';
 
 interface DateRange {
   rangeStart?: string;
@@ -27,13 +27,13 @@ function resolveRange(range: DateRange): { start: string; end: string; days: num
   return { start, end, days };
 }
 
-function count(sql: string, params: unknown[] = []): number {
-  const row = db.prepare(sql).get(...params) as { c: number } | undefined;
+async function count(sql: string, params: unknown[] = []): Promise<number> {
+  const row = await queryDb.get<{ c: number }>(sql, params);
   return row?.c || 0;
 }
 
-function sum(sql: string, params: unknown[] = []): number {
-  const row = db.prepare(sql).get(...params) as { s: number } | undefined;
+async function sum(sql: string, params: unknown[] = []): Promise<number> {
+  const row = await queryDb.get<{ s: number }>(sql, params);
   return row?.s || 0;
 }
 
@@ -64,65 +64,68 @@ export interface OverviewKpis {
   purchases: number;
 }
 
-export function getOverviewKpis(range: DateRange = {}): OverviewKpis {
+export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKpis> {
   const { start, end } = resolveRange(range);
   const inRange = 'store_id = ? AND created_at BETWEEN ? AND ?';
   const params = [STORE_ID, start, end];
 
-  const sessions = count(`SELECT COUNT(DISTINCT session_id) AS c FROM events WHERE ${inRange}`, params);
-  const visitors = count(`SELECT COUNT(DISTINCT visitor_id) AS c FROM events WHERE ${inRange}`, params);
-  const newVisitors = count(
-    `SELECT COUNT(DISTINCT v.id) AS c FROM visitors v
-     WHERE v.store_id = ? AND v.first_seen_at BETWEEN ? AND ?`,
-    [STORE_ID, start, end]
-  );
+  const [
+    sessions, visitors, newVisitors, orders,
+    grossSalesUGX, discountsUGX, refundsUGX, netSalesUGX, cogsUGX,
+  ] = await Promise.all([
+    count(`SELECT COUNT(DISTINCT session_id) AS c FROM events WHERE ${inRange}`, params),
+    count(`SELECT COUNT(DISTINCT visitor_id) AS c FROM events WHERE ${inRange}`, params),
+    count(
+      `SELECT COUNT(DISTINCT v.id) AS c FROM visitors v
+       WHERE v.store_id = ? AND v.first_seen_at BETWEEN ? AND ?`,
+      [STORE_ID, start, end]
+    ),
+    count(`SELECT COUNT(*) AS c FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(gross_sales_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(discount_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(refund_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(net_sales_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(total_cogs_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+  ]);
+
   const returningVisitors = Math.max(0, visitors - newVisitors);
-
-  const orderWhere = "store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?";
-  const orders = count(`SELECT COUNT(*) AS c FROM orders WHERE ${orderWhere}`, params);
-
-  const grossSalesUGX = sum(`SELECT COALESCE(SUM(gross_sales_cents),0) AS s FROM orders WHERE ${orderWhere}`, params);
-  const discountsUGX = sum(`SELECT COALESCE(SUM(discount_cents),0) AS s FROM orders WHERE ${orderWhere}`, params);
-  const refundsUGX = sum(`SELECT COALESCE(SUM(refund_cents),0) AS s FROM orders WHERE ${orderWhere}`, params);
-  const netSalesUGX = sum(`SELECT COALESCE(SUM(net_sales_cents),0) AS s FROM orders WHERE ${orderWhere}`, params);
-  const cogsUGX = sum(`SELECT COALESCE(SUM(total_cogs_cents),0) AS s FROM orders WHERE ${orderWhere}`, params);
   const grossProfitUGX = Math.max(0, netSalesUGX - cogsUGX);
   const grossMarginPct = netSalesUGX > 0 ? Math.round((grossProfitUGX / netSalesUGX) * 1000) / 10 : 0;
-
   const avgOrderValueUGX = orders > 0 ? Math.round(netSalesUGX / orders) : 0;
 
-  const unitsPerOrder = (() => {
-    const row = db.prepare(
-      `SELECT COALESCE(SUM(oi.qty),0) AS u, COUNT(DISTINCT o.id) AS cnt
-       FROM orders o
-       LEFT JOIN order_items oi ON oi.order_id = o.id
-       WHERE o.${orderWhere}`
-    ).get(...params) as { u: number; cnt: number } | undefined;
-    if (!row || row.cnt === 0) return 0;
-    return Math.round((row.u / row.cnt) * 100) / 100;
-  })();
+  const unitsRow = await queryDb.get<{ u: number; cnt: number }>(
+    `SELECT COALESCE(SUM(oi.qty),0) AS u, COUNT(DISTINCT o.id) AS cnt
+     FROM orders o
+     LEFT JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.store_id = ? AND o.status NOT IN ('cancelled','refunded') AND o.created_at BETWEEN ? AND ?`,
+    params
+  );
+  const unitsPerOrder = (!unitsRow || unitsRow.cnt === 0) ? 0 : Math.round((unitsRow.u / unitsRow.cnt) * 100) / 100;
 
-  const customerNewWhere = 'store_id = ? AND created_at BETWEEN ? AND ?';
-  const newCustomers = count(`SELECT COUNT(*) AS c FROM customers WHERE ${customerNewWhere}`, params);
-  const uniqueCustRow = db.prepare(
-    `SELECT COUNT(DISTINCT customer_id) AS c FROM orders WHERE ${orderWhere} AND customer_id IS NOT NULL`
-  ).get(...params) as { c: number } | undefined;
-  const totalOrderCustomers = uniqueCustRow?.c || 0;
-  const returningCustomers = Math.max(0, totalOrderCustomers - newCustomers);
-
+  const orderWhere = "store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?";
+  const newCustomers = count(`SELECT COUNT(*) AS c FROM customers WHERE store_id = ? AND created_at BETWEEN ? AND ?`, params);
+  const uniqueCustRow = queryDb.get<{ c: number }>(
+    `SELECT COUNT(DISTINCT customer_id) AS c FROM orders WHERE ${orderWhere} AND customer_id IS NOT NULL`,
+    params
+  );
+  const [newCustResult, custRow] = await Promise.all([newCustomers, uniqueCustRow]);
+  const totalOrderCustomers = custRow?.c || 0;
+  const returningCustomersResult = Math.max(0, totalOrderCustomers - newCustResult);
   const conversionRatePct = sessions > 0 ? Math.round((orders / sessions) * 1000) / 10 : 0;
 
-  const marketingSpendUGX = sum(
+  const marketingSpendUGX = await sum(
     `SELECT COALESCE(SUM(spend_cents),0) AS s FROM marketing_spend WHERE store_id = ? AND spend_date BETWEEN ? AND ?`,
     [STORE_ID, start.slice(0, 10), end.slice(0, 10)]
   );
   const roas = marketingSpendUGX > 0 ? Math.round((netSalesUGX / marketingSpendUGX) * 100) / 100 : 0;
-  const cacUGX = newCustomers > 0 ? Math.round(marketingSpendUGX / newCustomers) : 0;
+  const cacUGX = newCustResult > 0 ? Math.round(marketingSpendUGX / newCustResult) : 0;
 
-  const pageviews = count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'page_view'`, params);
-  const addToCarts = count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'add_to_cart'`, params);
-  const checkoutStarts = count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'begin_checkout'`, params);
-  const purchases = count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'purchase'`, params);
+  const [pageviews, addToCarts, checkoutStarts, purchases] = await Promise.all([
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'page_view'`, params),
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'add_to_cart'`, params),
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'begin_checkout'`, params),
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'purchase'`, params),
+  ]);
 
   return {
     sessions,
@@ -130,8 +133,8 @@ export function getOverviewKpis(range: DateRange = {}): OverviewKpis {
     newVisitors,
     returningVisitors,
     orders,
-    newCustomers,
-    returningCustomers,
+    newCustomers: newCustResult,
+    returningCustomers: returningCustomersResult,
     conversionRatePct,
     grossSalesUGX,
     netSalesUGX,
@@ -168,7 +171,7 @@ export interface FunnelResult {
   steps: FunnelStep[];
 }
 
-export function getFunnel(range: DateRange & { device?: string; source?: string; campaign?: string; landingPath?: string; productSlug?: string } = {}): FunnelResult {
+export async function getFunnel(range: DateRange & { device?: string; source?: string; campaign?: string; landingPath?: string; productSlug?: string } = {}): Promise<FunnelResult> {
   const { start, end } = resolveRange(range);
   const baseParams = [STORE_ID, start, end];
 
@@ -180,11 +183,13 @@ export function getFunnel(range: DateRange & { device?: string; source?: string;
     params.push(`%"product_slug":"${range.productSlug}"%`);
   }
 
-  const productViews = count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'product_view'`, params);
-  const addToCarts = count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'add_to_cart'`, params);
-  const checkoutStarts = count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'begin_checkout'`, params);
-  const contactSubmitted = count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'checkout_contact_submitted'`, params);
-  const purchases = count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'purchase'`, params);
+  const [productViews, addToCarts, checkoutStarts, contactSubmitted, purchases] = await Promise.all([
+    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'product_view'`, params),
+    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'add_to_cart'`, params),
+    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'begin_checkout'`, params),
+    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'checkout_contact_submitted'`, params),
+    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'purchase'`, params),
+  ]);
 
   const pct = (num: number, den: number): number => {
     if (den <= 0) return 0;
@@ -226,13 +231,26 @@ export interface ProductStat {
   inventoryVelocity: number;
 }
 
-export function getProductStats(range: DateRange & { topN?: number } = {}): ProductStat[] {
+export async function getProductStats(range: DateRange & { topN?: number } = {}): Promise<ProductStat[]> {
   const { start, end, days } = resolveRange(range);
   const topN = range.topN ?? 20;
 
-  const params = [STORE_ID, start, end];
-
-  const rows = db.prepare(`
+  const rows = await queryDb.all<{
+    product_id: string;
+    product_slug: string;
+    product_name: string;
+    collection: string | null;
+    productViews: number;
+    addToCarts: number;
+    orders: number;
+    unitsSold: number;
+    grossSalesUGX: number;
+    discountsUGX: number;
+    refundsUGX: number;
+    netSalesUGX: number;
+    cogsUGX: number;
+    grossProfitUGX: number;
+  }>(`
     SELECT
       p.id AS product_id,
       p.slug AS product_slug,
@@ -284,22 +302,7 @@ export function getProductStats(range: DateRange & { topN?: number } = {}): Prod
     WHERE p.store_id = ?
     ORDER BY (COALESCE(oi_stats.net, 0) + COALESCE(pv.cnt, 0)) DESC
     LIMIT ?
-  `).all(STORE_ID, start, end, STORE_ID, start, end, STORE_ID, start, end, STORE_ID, topN) as Array<{
-    product_id: string;
-    product_slug: string;
-    product_name: string;
-    collection: string | null;
-    productViews: number;
-    addToCarts: number;
-    orders: number;
-    unitsSold: number;
-    grossSalesUGX: number;
-    discountsUGX: number;
-    refundsUGX: number;
-    netSalesUGX: number;
-    cogsUGX: number;
-    grossProfitUGX: number;
-  }>;
+  `, [STORE_ID, start, end, STORE_ID, start, end, STORE_ID, start, end, STORE_ID, topN]);
 
   return rows.map((r) => {
     const atcRatePct = r.productViews > 0 ? Math.round((r.addToCarts / r.productViews) * 1000) / 10 : 0;
@@ -336,16 +339,16 @@ export interface CustomerStats {
   purchaseHistory: Array<{ date: string; orders: number; new_customers: number }>;
 }
 
-export function getCustomerStats(range: DateRange = {}): CustomerStats {
+export async function getCustomerStats(range: DateRange = {}): Promise<CustomerStats> {
   const { start, end } = resolveRange(range);
   const params = [STORE_ID, start, end];
 
-  const newCustomers = count(
+  const newCustomers = await count(
     `SELECT COUNT(*) AS c FROM customers WHERE store_id = ? AND created_at BETWEEN ? AND ?`,
     params
   );
 
-  const repeatRow = db.prepare(`
+  const repeatRow = await queryDb.get<{ total_cust: number; repeat_cust: number }>(`
     SELECT
       COUNT(DISTINCT customer_id) AS total_cust,
       COUNT(DISTINCT CASE WHEN order_count >= 2 THEN customer_id END) AS repeat_cust
@@ -355,30 +358,30 @@ export function getCustomerStats(range: DateRange = {}): CustomerStats {
       WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND customer_id IS NOT NULL
       GROUP BY customer_id
     )
-  `).get(STORE_ID) as { total_cust: number; repeat_cust: number } | undefined;
+  `, [STORE_ID]);
 
   const totalCust = repeatRow?.total_cust || 0;
   const repeatCust = repeatRow?.repeat_cust || 0;
   const returningCustomers = repeatCust;
   const repeatPurchaseRatePct = totalCust > 0 ? Math.round((repeatCust / totalCust) * 1000) / 10 : 0;
 
-  const ltvRow = db.prepare(`
+  const ltvRow = await queryDb.get<{ cnt: number; total: number }>(`
     SELECT
       COUNT(DISTINCT customer_id) AS cnt,
       COALESCE(SUM(net_sales_cents), 0) AS total
     FROM orders
     WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND customer_id IS NOT NULL
-  `).get(STORE_ID) as { cnt: number; total: number } | undefined;
+  `, [STORE_ID]);
   const lifetimeRevenuePerCustomerUGX = (ltvRow && ltvRow.cnt > 0) ? Math.round(ltvRow.total / ltvRow.cnt) : 0;
 
-  const medRows = db.prepare(`
+  const medRows = await queryDb.all<{ customer_id: string; created_at: string }>(`
     SELECT
       customer_id,
       created_at
     FROM orders
     WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND customer_id IS NOT NULL
     ORDER BY customer_id, created_at
-  `).all(STORE_ID) as Array<{ customer_id: string; created_at: string }>;
+  `, [STORE_ID]);
 
   const gaps: number[] = [];
   let currentCust = '';
@@ -398,7 +401,7 @@ export function getCustomerStats(range: DateRange = {}): CustomerStats {
     ? Math.round((gaps[Math.floor(gaps.length / 2)] || 0) * 10) / 10
     : 0;
 
-  const cohortRows = db.prepare(`
+  const cohortRows = await queryDb.all<{ month: string; size: number }>(`
     SELECT
       strftime('%Y-%m', c.created_at) AS month,
       COUNT(DISTINCT c.id) AS size
@@ -407,7 +410,7 @@ export function getCustomerStats(range: DateRange = {}): CustomerStats {
     GROUP BY month
     ORDER BY month DESC
     LIMIT 6
-  `).all(STORE_ID) as Array<{ month: string; size: number }>;
+  `, [STORE_ID]);
 
   const cohorts: CustomerCohort[] = cohortRows.map((cr) => ({
     month: cr.month,
@@ -415,7 +418,7 @@ export function getCustomerStats(range: DateRange = {}): CustomerStats {
     retained: [{ m1: Math.round(cr.size * 0.6) }, { m2: Math.round(cr.size * 0.4) }, { m3: Math.round(cr.size * 0.25) }],
   }));
 
-  const topCustomersRows = db.prepare(`
+  const topCustomersRows = await queryDb.all<TopCustomer>(`
     SELECT
       c.id AS id,
       COALESCE(c.full_name, 'Customer ' || substr(c.id, -4)) AS name,
@@ -428,9 +431,9 @@ export function getCustomerStats(range: DateRange = {}): CustomerStats {
     WHERE c.store_id = ?
     ORDER BY c.total_spent_cents DESC, c.total_orders DESC
     LIMIT 20
-  `).all(STORE_ID) as TopCustomer[];
+  `, [STORE_ID]);
 
-  const phRows = db.prepare(`
+  const phRows = await queryDb.all<{ date: string; orders: number; cust_cnt: number }>(`
     SELECT
       DATE(created_at) AS date,
       COUNT(*) AS orders,
@@ -440,7 +443,7 @@ export function getCustomerStats(range: DateRange = {}): CustomerStats {
     GROUP BY DATE(created_at)
     ORDER BY date DESC
     LIMIT 30
-  `).all(...params) as Array<{ date: string; orders: number; cust_cnt: number }>;
+  `, params);
 
   const purchaseHistory = phRows.map((r) => ({
     date: r.date,
@@ -512,48 +515,56 @@ function classifySourceStatic(
   }
 }
 
-export function getMarketingStats(range: DateRange = {}): MarketingStats {
+export async function getMarketingStats(range: DateRange = {}): Promise<MarketingStats> {
   const { start, end } = resolveRange(range);
   const params = [STORE_ID, start, end];
 
-  const sessionRows = db.prepare(`
-    SELECT
-      COALESCE(s.source_class, 'direct') AS source_class,
-      s.utm_source AS utm_source,
-      s.utm_medium AS utm_medium,
-      s.utm_campaign AS utm_campaign,
-      COUNT(DISTINCT s.id) AS sessions
-    FROM sessions s
-    WHERE s.store_id = ? AND s.started_at BETWEEN ? AND ?
-    GROUP BY COALESCE(s.source_class,'direct'), s.utm_source, s.utm_medium, s.utm_campaign
-    ORDER BY sessions DESC
-  `).all(...params) as Array<{
-    source_class: string;
-    utm_source: string | null;
-    utm_medium: string | null;
-    utm_campaign: string | null;
-    sessions: number;
-  }>;
-
-  const orderRows = db.prepare(`
-    SELECT
-      COALESCE(o.source_class, 'direct') AS source_class,
-      o.utm_source AS utm_source,
-      o.utm_medium AS utm_medium,
-      o.utm_campaign AS utm_campaign,
-      COUNT(*) AS orders,
-      COALESCE(SUM(o.net_sales_cents), 0) AS revenue
-    FROM orders o
-    WHERE o.store_id = ? AND o.status NOT IN ('cancelled','refunded') AND o.created_at BETWEEN ? AND ?
-    GROUP BY COALESCE(o.source_class,'direct'), o.utm_source, o.utm_medium, o.utm_campaign
-  `).all(...params) as Array<{
-    source_class: string;
-    utm_source: string | null;
-    utm_medium: string | null;
-    utm_campaign: string | null;
-    orders: number;
-    revenue: number;
-  }>;
+  const [sessionRows, orderRows, campRows] = await Promise.all([
+    queryDb.all<{
+      source_class: string;
+      utm_source: string | null;
+      utm_medium: string | null;
+      utm_campaign: string | null;
+      sessions: number;
+    }>(`
+      SELECT
+        COALESCE(s.source_class, 'direct') AS source_class,
+        s.utm_source AS utm_source,
+        s.utm_medium AS utm_medium,
+        s.utm_campaign AS utm_campaign,
+        COUNT(DISTINCT s.id) AS sessions
+      FROM sessions s
+      WHERE s.store_id = ? AND s.started_at BETWEEN ? AND ?
+      GROUP BY COALESCE(s.source_class,'direct'), s.utm_source, s.utm_medium, s.utm_campaign
+      ORDER BY sessions DESC
+    `, params),
+    queryDb.all<{
+      source_class: string;
+      utm_source: string | null;
+      utm_medium: string | null;
+      utm_campaign: string | null;
+      orders: number;
+      revenue: number;
+    }>(`
+      SELECT
+        COALESCE(o.source_class, 'direct') AS source_class,
+        o.utm_source AS utm_source,
+        o.utm_medium AS utm_medium,
+        o.utm_campaign AS utm_campaign,
+        COUNT(*) AS orders,
+        COALESCE(SUM(o.net_sales_cents), 0) AS revenue
+      FROM orders o
+      WHERE o.store_id = ? AND o.status NOT IN ('cancelled','refunded') AND o.created_at BETWEEN ? AND ?
+      GROUP BY COALESCE(o.source_class,'direct'), o.utm_source, o.utm_medium, o.utm_campaign
+    `, params),
+    queryDb.all<{ id: string; name: string; utm_source: string | null; utm_medium: string | null; utm_campaign: string | null }>(`
+      SELECT c.id, c.name, c.utm_source, c.utm_medium, c.utm_campaign
+      FROM campaigns c
+      WHERE c.store_id = ?
+      ORDER BY c.created_at DESC
+      LIMIT 50
+    `, [STORE_ID]),
+  ]);
 
   const orderKey = (r: { source_class: string; utm_source: string | null; utm_medium: string | null; utm_campaign: string | null }) =>
     `${r.source_class}|${r.utm_source || ''}|${r.utm_medium || ''}|${r.utm_campaign || ''}`;
@@ -565,7 +576,7 @@ export function getMarketingStats(range: DateRange = {}): MarketingStats {
     const key = orderKey(s);
     const ord = orderMap.get(key) || { orders: 0, revenue: 0 };
     const conv = s.sessions > 0 ? Math.round((ord.orders / s.sessions) * 1000) / 10 : 0;
-    const roas = 0 > 0 ? 0 : ord.revenue > 0 ? ord.revenue / (ord.orders * 10000 || 1) : 0;
+    const roas = ord.revenue > 0 ? ord.revenue / (ord.orders * 10000 || 1) : 0;
     return {
       source_class: classifySourceStatic(null, { utm_source: s.utm_source, utm_medium: s.utm_medium }) || s.source_class,
       utm_source: s.utm_source,
@@ -597,14 +608,6 @@ export function getMarketingStats(range: DateRange = {}): MarketingStats {
 
   const unattributed = channels.find((c) => c.source_class === 'direct' && !c.utm_source) || { ...emptyChannel, source_class: 'unattributed' };
   const directTraffic = channels.find((c) => c.source_class === 'direct') || { ...emptyChannel, source_class: 'direct' };
-
-  const campRows = db.prepare(`
-    SELECT c.id, c.name, c.utm_source, c.utm_medium, c.utm_campaign
-    FROM campaigns c
-    WHERE c.store_id = ?
-    ORDER BY c.created_at DESC
-    LIMIT 50
-  `).all(STORE_ID) as Array<{ id: string; name: string; utm_source: string | null; utm_medium: string | null; utm_campaign: string | null }>;
 
   const campaignList: CampaignRow[] = campRows.map((c) => {
     const sess = sessionRows.find(
@@ -644,46 +647,44 @@ export interface AbandonmentStats {
   suppressionCount: number;
 }
 
-export function getAbandonmentStats(range: DateRange = {}): AbandonmentStats {
+export async function getAbandonmentStats(range: DateRange = {}): Promise<AbandonmentStats> {
   const now = new Date();
   const sixtyMinAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
   const { start, end } = resolveRange(range);
   const params = [STORE_ID, start, end];
 
-  const activeCarts = count(
-    `SELECT COUNT(*) AS c FROM carts WHERE store_id = ? AND status = 'active' AND updated_at BETWEEN ? AND ?`,
-    params
-  );
-
-  const abandonedCarts = count(
-    `SELECT COUNT(*) AS c FROM carts WHERE store_id = ?
-     AND ((status = 'abandoned') OR (status = 'active' AND updated_at < ?))
-     AND created_at BETWEEN ? AND ?`,
-    [STORE_ID, sixtyMinAgo, start, end]
-  );
-
-  const abandonedCheckouts = count(
-    `SELECT COUNT(*) AS c FROM checkouts WHERE store_id = ?
-     AND (status = 'abandoned' OR (status = 'started' AND started_at < ?))
-     AND started_at BETWEEN ? AND ?`,
-    [STORE_ID, sixtyMinAgo, start, end]
-  );
-
-  const recoveredOrders = count(
-    `SELECT COUNT(*) AS c FROM orders WHERE store_id = ?
-     AND status NOT IN ('cancelled','refunded')
-     AND EXISTS (SELECT 1 FROM carts cr WHERE cr.id = orders.cart_id AND cr.status = 'abandoned')
-     AND orders.created_at BETWEEN ? AND ?`,
-    [STORE_ID, start, end]
-  );
-
-  const recoveredRevenueUGX = sum(
-    `SELECT COALESCE(SUM(net_sales_cents),0) AS s FROM orders WHERE store_id = ?
-     AND status NOT IN ('cancelled','refunded')
-     AND EXISTS (SELECT 1 FROM carts cr WHERE cr.id = orders.cart_id AND cr.status = 'abandoned')
-     AND orders.created_at BETWEEN ? AND ?`,
-    [STORE_ID, start, end]
-  );
+  const [activeCarts, abandonedCarts, abandonedCheckouts, recoveredOrders, recoveredRevenueUGX] = await Promise.all([
+    count(
+      `SELECT COUNT(*) AS c FROM carts WHERE store_id = ? AND status = 'active' AND updated_at BETWEEN ? AND ?`,
+      params
+    ),
+    count(
+      `SELECT COUNT(*) AS c FROM carts WHERE store_id = ?
+       AND ((status = 'abandoned') OR (status = 'active' AND updated_at < ?))
+       AND created_at BETWEEN ? AND ?`,
+      [STORE_ID, sixtyMinAgo, start, end]
+    ),
+    count(
+      `SELECT COUNT(*) AS c FROM checkouts WHERE store_id = ?
+       AND (status = 'abandoned' OR (status = 'started' AND started_at < ?))
+       AND started_at BETWEEN ? AND ?`,
+      [STORE_ID, sixtyMinAgo, start, end]
+    ),
+    count(
+      `SELECT COUNT(*) AS c FROM orders WHERE store_id = ?
+       AND status NOT IN ('cancelled','refunded')
+       AND EXISTS (SELECT 1 FROM carts cr WHERE cr.id = orders.cart_id AND cr.status = 'abandoned')
+       AND orders.created_at BETWEEN ? AND ?`,
+      [STORE_ID, start, end]
+    ),
+    sum(
+      `SELECT COALESCE(SUM(net_sales_cents),0) AS s FROM orders WHERE store_id = ?
+       AND status NOT IN ('cancelled','refunded')
+       AND EXISTS (SELECT 1 FROM carts cr WHERE cr.id = orders.cart_id AND cr.status = 'abandoned')
+       AND orders.created_at BETWEEN ? AND ?`,
+      [STORE_ID, start, end]
+    ),
+  ]);
 
   const recoveryMessagesSent = Math.round(abandonedCheckouts * 0.7);
   const unsubscribedCount = Math.round(recoveryMessagesSent * 0.05);
@@ -714,16 +715,16 @@ export interface CampaignListItem {
   created_by: string | null;
 }
 
-export function getCampaignList(storeId: string = STORE_ID): CampaignListItem[] {
-  return db.prepare(`
+export async function getCampaignList(storeId: string = STORE_ID): Promise<CampaignListItem[]> {
+  return queryDb.all<CampaignListItem>(`
     SELECT id, name, utm_source, utm_medium, utm_campaign, utm_content, utm_term, landing_url, created_at, created_by
     FROM campaigns
     WHERE store_id = ?
     ORDER BY created_at DESC
-  `).all(storeId) as CampaignListItem[];
+  `, [storeId]);
 }
 
-export function createCampaign(input: {
+export async function createCampaign(input: {
   storeId?: string;
   name: string;
   utm_source?: string | null;
@@ -733,13 +734,13 @@ export function createCampaign(input: {
   utm_term?: string | null;
   landing_url?: string | null;
   createdBy?: string | null;
-}): string {
+}): Promise<string> {
   const id = 'camp_' + uuid();
   const now = nowISO();
-  db.prepare(`
+  await queryDb.run(`
     INSERT INTO campaigns (id, store_id, name, utm_source, utm_medium, utm_campaign, utm_content, utm_term, landing_url, created_by, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `, [
     id,
     input.storeId || STORE_ID,
     input.name,
@@ -750,8 +751,8 @@ export function createCampaign(input: {
     input.utm_term || null,
     input.landing_url || null,
     input.createdBy || null,
-    now
-  );
+    now,
+  ]);
   return id;
 }
 
@@ -761,10 +762,10 @@ export interface TopPageRow {
   unique_visitors: number;
 }
 
-export function getTopPages(range: DateRange & { limit?: number } = {}): TopPageRow[] {
+export async function getTopPages(range: DateRange & { limit?: number } = {}): Promise<TopPageRow[]> {
   const { start, end } = resolveRange(range);
   const limit = range.limit ?? 20;
-  return db.prepare(`
+  return queryDb.all<TopPageRow>(`
     SELECT
       COALESCE(page_path, '/') AS page_path,
       COUNT(*) AS views,
@@ -774,7 +775,7 @@ export function getTopPages(range: DateRange & { limit?: number } = {}): TopPage
     GROUP BY page_path
     ORDER BY views DESC
     LIMIT ?
-  `).all(STORE_ID, start, end, limit) as TopPageRow[];
+  `, [STORE_ID, start, end, limit]);
 }
 
 export interface TrafficSourceRow {
@@ -783,9 +784,9 @@ export interface TrafficSourceRow {
   pct: number;
 }
 
-export function getTrafficSources(range: DateRange = {}): TrafficSourceRow[] {
+export async function getTrafficSources(range: DateRange = {}): Promise<TrafficSourceRow[]> {
   const { start, end } = resolveRange(range);
-  const rows = db.prepare(`
+  const rows = await queryDb.all<{ source_class: string; sessions: number }>(`
     SELECT
       COALESCE(source_class, 'direct') AS source_class,
       COUNT(DISTINCT id) AS sessions
@@ -793,7 +794,7 @@ export function getTrafficSources(range: DateRange = {}): TrafficSourceRow[] {
     WHERE store_id = ? AND started_at BETWEEN ? AND ?
     GROUP BY COALESCE(source_class, 'direct')
     ORDER BY sessions DESC
-  `).all(STORE_ID, start, end) as Array<{ source_class: string; sessions: number }>;
+  `, [STORE_ID, start, end]);
 
   const total = rows.reduce((s, r) => s + r.sessions, 0) || 1;
   return rows.map((r) => ({
@@ -810,9 +811,9 @@ export interface RevenueByCollectionRow {
   orders: number;
 }
 
-export function getRevenueByCollection(range: DateRange = {}): RevenueByCollectionRow[] {
+export async function getRevenueByCollection(range: DateRange = {}): Promise<RevenueByCollectionRow[]> {
   const { start, end } = resolveRange(range);
-  const rows = db.prepare(`
+  return queryDb.all<RevenueByCollectionRow>(`
     SELECT
       COALESCE(p.collection, 'Uncategorized') AS collection,
       COALESCE(SUM(oi.net_sales_cents), 0) AS revenue,
@@ -824,8 +825,7 @@ export function getRevenueByCollection(range: DateRange = {}): RevenueByCollecti
     WHERE oi.store_id = ? AND o.status NOT IN ('cancelled','refunded') AND o.created_at BETWEEN ? AND ?
     GROUP BY COALESCE(p.collection, 'Uncategorized')
     ORDER BY revenue DESC
-  `).all(STORE_ID, start, end) as RevenueByCollectionRow[];
-  return rows;
+  `, [STORE_ID, start, end]);
 }
 
 export type Granularity = 'day' | 'week' | 'month';
@@ -837,29 +837,30 @@ export interface SalesTimelineRow {
   visits: number;
 }
 
-export function getSalesTimeline(range: DateRange & { granularity?: Granularity } = {}): SalesTimelineRow[] {
+export async function getSalesTimeline(range: DateRange & { granularity?: Granularity } = {}): Promise<SalesTimelineRow[]> {
   const { start, end } = resolveRange(range);
   const g = range.granularity || 'day';
   const format = g === 'week' ? '%Y-W%W' : g === 'month' ? '%Y-%m' : '%Y-%m-%d';
 
-  const orderRows = db.prepare(`
-    SELECT
-      strftime(?, created_at) AS date,
-      COALESCE(SUM(net_sales_cents), 0) AS revenue,
-      COUNT(*) AS orders
-    FROM orders
-    WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?
-    GROUP BY strftime(?, created_at)
-  `).all(format, STORE_ID, start, end, format) as Array<{ date: string; revenue: number; orders: number }>;
-
-  const visitRows = db.prepare(`
-    SELECT
-      strftime(?, created_at) AS date,
-      COUNT(DISTINCT session_id) AS visits
-    FROM events
-    WHERE store_id = ? AND event_name = 'page_view' AND created_at BETWEEN ? AND ?
-    GROUP BY strftime(?, created_at)
-  `).all(format, STORE_ID, start, end, format) as Array<{ date: string; visits: number }>;
+  const [orderRows, visitRows] = await Promise.all([
+    queryDb.all<{ date: string; revenue: number; orders: number }>(`
+      SELECT
+        strftime(?, created_at) AS date,
+        COALESCE(SUM(net_sales_cents), 0) AS revenue,
+        COUNT(*) AS orders
+      FROM orders
+      WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?
+      GROUP BY strftime(?, created_at)
+    `, [format, STORE_ID, start, end, format]),
+    queryDb.all<{ date: string; visits: number }>(`
+      SELECT
+        strftime(?, created_at) AS date,
+        COUNT(DISTINCT session_id) AS visits
+      FROM events
+      WHERE store_id = ? AND event_name = 'page_view' AND created_at BETWEEN ? AND ?
+      GROUP BY strftime(?, created_at)
+    `, [format, STORE_ID, start, end, format]),
+  ]);
 
   const visitMap = new Map<string, number>();
   for (const r of visitRows) visitMap.set(r.date, r.visits);
@@ -874,6 +875,5 @@ export function getSalesTimeline(range: DateRange & { granularity?: Granularity 
     }
   }
 
-  const result = Array.from(combined.values()).sort((a, b) => a.date.localeCompare(b.date));
-  return result;
+  return Array.from(combined.values()).sort((a, b) => a.date.localeCompare(b.date));
 }

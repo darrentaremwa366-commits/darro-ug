@@ -4,7 +4,7 @@ import {
   signAdminSession,
   setSessionCookie,
 } from '@/lib/auth';
-import db, { STORE_ID, nowISO, uuid } from '@/lib/db';
+import { queryDb, STORE_ID, nowISO, uuid } from '@/lib/db';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,20 +43,21 @@ export async function POST(req: NextRequest) {
       await sleep(800);
 
       try {
-        db.prepare(
+        await queryDb.run(
           `INSERT INTO admin_audit_log (id, store_id, admin_user_id, action, resource_type, resource_id, details_json, ip_address, user_agent, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(
-          auditId,
-          STORE_ID,
-          null,
-          'login_failed',
-          'admin_user',
-          null,
-          JSON.stringify({ email: email.toLowerCase() }),
-          ip,
-          userAgent,
-          now
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            auditId,
+            STORE_ID,
+            null,
+            'login_failed',
+            'admin_user',
+            null,
+            JSON.stringify({ email: email.toLowerCase() }),
+            ip,
+            userAgent,
+            now
+          ]
         );
       } catch { /* audit log best-effort only */ }
 
@@ -74,20 +75,21 @@ export async function POST(req: NextRequest) {
     });
 
     try {
-      db.prepare(
+      await queryDb.run(
         `INSERT INTO admin_audit_log (id, store_id, admin_user_id, action, resource_type, resource_id, details_json, ip_address, user_agent, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        auditId,
-        STORE_ID,
-        admin.id,
-        'login_success',
-        'admin_user',
-        admin.id,
-        JSON.stringify({ email: admin.email.toLowerCase(), role: admin.role }),
-        ip,
-        userAgent,
-        now
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          auditId,
+          STORE_ID,
+          admin.id,
+          'login_success',
+          'admin_user',
+          admin.id,
+          JSON.stringify({ email: admin.email.toLowerCase(), role: admin.role }),
+          ip,
+          userAgent,
+          now
+        ]
       );
     } catch { /* audit log best-effort only */ }
 

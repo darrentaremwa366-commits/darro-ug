@@ -10,7 +10,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const campaigns = getCampaignList(user.storeId || STORE_ID);
+    const campaigns = await getCampaignList(user.storeId || STORE_ID);
     return NextResponse.json({ campaigns });
   } catch (e) {
     const err = e instanceof Error ? e.message : 'Unknown error';
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Campaign name is required' }, { status: 400 });
     }
 
-    const id = createCampaign({
+    const id = await createCampaign({
       storeId: user.storeId || STORE_ID,
       name,
       utm_source: body.utm_source || null,

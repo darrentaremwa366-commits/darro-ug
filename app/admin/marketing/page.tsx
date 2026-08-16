@@ -22,8 +22,10 @@ export default async function AdminMarketing() {
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
 
-  const stats = getMarketingStats();
-  const kpis = getOverviewKpis();
+  const [stats, kpis] = await Promise.all([
+    getMarketingStats(),
+    getOverviewKpis(),
+  ]);
 
   const totalChannelSessions = stats.channels.reduce((s, c) => s + c.sessions, 0);
   const totalChannelOrders = stats.channels.reduce((s, c) => s + c.orders, 0);

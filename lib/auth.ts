@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import bcryptjs from 'bcryptjs';
-import db, { STORE_ID, nowISO, uuid } from '@/lib/db';
+import { queryDb, STORE_ID, nowISO, uuid } from '@/lib/db';
 
 export const JWT_SECRET: string =
   process.env.ADMIN_JWT_SECRET ||
@@ -108,11 +108,10 @@ export async function verifyAdminLogin(
     return null;
   }
 
-  const row = db
-    .prepare(
-      `SELECT * FROM admin_users WHERE store_id = ? AND LOWER(email) = ?`
-    )
-    .get(STORE_ID, normalizedEmail) as AdminUserRow | undefined;
+  const row = await queryDb.get<AdminUserRow>(
+    `SELECT * FROM admin_users WHERE store_id = ? AND LOWER(email) = ?`,
+    [STORE_ID, normalizedEmail]
+  );
 
   if (!row) return null;
 

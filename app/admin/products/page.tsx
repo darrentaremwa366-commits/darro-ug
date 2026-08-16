@@ -15,8 +15,10 @@ export default async function AdminProducts() {
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
 
-  const productStats = getProductStats({ topN: 50 });
-  const kpis = getOverviewKpis();
+  const [productStats, kpis] = await Promise.all([
+    getProductStats({ topN: 50 }),
+    getOverviewKpis(),
+  ]);
 
   const totalViews = productStats.reduce((s, r) => s + r.productViews, 0);
   const totalATC = productStats.reduce((s, r) => s + r.addToCarts, 0);

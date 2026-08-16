@@ -7,7 +7,7 @@ import {
 } from "@/lib/admin/queries";
 import AdminLayout from "@/components/admin/AdminLayout";
 import StatCard from "@/components/admin/StatCard";
-import db, { STORE_ID } from "@/lib/db";
+import { queryDb, STORE_ID } from "@/lib/db";
 
 function formatUGX(amount: number): string {
   return `UGX ${Intl.NumberFormat("en-UG").format(amount)}`;
@@ -46,25 +46,24 @@ interface OrderRow {
   units_count: number;
 }
 
-function getRecentOrders(limit = 50): OrderRow[] {
-  const rows = db
-    .prepare(
-      `SELECT
-         o.id, o.order_number, o.status,
-         o.customer_name, o.customer_email, o.customer_phone,
-         o.gross_sales_cents, o.discount_cents, o.net_sales_cents,
-         o.total_cogs_cents, o.gross_profit_cents, o.currency,
-         o.created_at, o.source_class,
-         COUNT(DISTINCT oi.id) AS items_count,
-         COALESCE(SUM(oi.qty), 0) AS units_count
-       FROM orders o
-       LEFT JOIN order_items oi ON oi.order_id = o.id
-       WHERE o.store_id = ?
-       GROUP BY o.id
-       ORDER BY o.created_at DESC
-       LIMIT ?`
-    )
-    .all(STORE_ID, limit) as OrderRow[];
+async function getRecentOrders(limit = 50): Promise<OrderRow[]> {
+  const rows = await queryDb.all<OrderRow>(
+    `SELECT
+       o.id, o.order_number, o.status,
+       o.customer_name, o.customer_email, o.customer_phone,
+       o.gross_sales_cents, o.discount_cents, o.net_sales_cents,
+       o.total_cogs_cents, o.gross_profit_cents, o.currency,
+       o.created_at, o.source_class,
+       COUNT(DISTINCT oi.id) AS items_count,
+       COALESCE(SUM(oi.qty), 0) AS units_count
+     FROM orders o
+     LEFT JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.store_id = ?
+     GROUP BY o.id
+     ORDER BY o.created_at DESC
+     LIMIT ?`,
+    [STORE_ID, limit]
+  );
   return rows;
 }
 
@@ -92,10 +91,12 @@ export default async function AdminOrders() {
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
 
-  const abandonment = getAbandonmentStats();
-  const kpis = getOverviewKpis();
-  const timeline = getSalesTimeline({ granularity: "day" });
-  const orders = getRecentOrders(60);
+  const [abandonment, kpis, timeline, orders] = await Promise.all([
+    getAbandonmentStats(),
+    getOverviewKpis(),
+    getSalesTimeline({ granularity: "day" }),
+    getRecentOrders(60),
+  ]);
 
   const totalRevenue = orders.reduce((s, o) => s + (o.net_sales_cents || 0), 0);
   const totalUnits = orders.reduce((s, o) => s + (o.units_count || 0), 0);

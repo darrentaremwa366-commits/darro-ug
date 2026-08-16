@@ -1,0 +1,28 @@
+{
+  "production_urls": {
+    "homepage": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/",
+    "shop": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/shop",
+    "membership": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/membership",
+    "faq": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/faq",
+    "collections": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/collections",
+    "cart": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/cart"
+  },
+  "admin_dashboard_urls": {
+    "login": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/admin/login",
+    "overview_dashboard": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/admin/overview",
+    "products": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/admin/products",
+    "orders": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/admin/orders",
+    "customers": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/admin/customers",
+    "conversations": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/admin/conversations",
+    "analytics": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/admin/analytics",
+    "marketing": "https://darro-c9n77njm7-darrentaremwa366-commits-projects.vercel.app/admin/marketing"
+  },
+  "admin_login": {
+    "default_email": "owner@darro.co",
+    "note": "Set ADMIN_PASSWORD env var on Vercel for your custom password, otherwise use default DB password darro2026"
+  },
+  "whatsapp_contact": {
+    "number": "+86 158 1740 4017",
+    "direct_link": "https://wa.me/8615817404017"
+  }
+}

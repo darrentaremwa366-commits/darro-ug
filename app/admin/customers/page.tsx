@@ -15,8 +15,10 @@ export default async function AdminCustomers() {
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
 
-  const stats = getCustomerStats();
-  const kpis = getOverviewKpis();
+  const [stats, kpis] = await Promise.all([
+    getCustomerStats(),
+    getOverviewKpis(),
+  ]);
 
   return (
     <AdminLayout title="Customers" subtitle={`Customer insights · Last 30 days`}>

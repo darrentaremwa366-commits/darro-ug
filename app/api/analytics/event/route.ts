@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db, { STORE_ID, nowISO, uuid } from '@/lib/db';
+import { queryDb, STORE_ID, nowISO, uuid } from '@/lib/db';
 
 const ALLOWED_EVENTS = new Set([
   'page_view',
@@ -208,9 +208,10 @@ export async function POST(req: NextRequest) {
     const now = nowISO();
     const eventId = (body.event_id && typeof body.event_id === 'string') ? body.event_id : uuid();
 
-    const existingEvent = db
-      .prepare('SELECT id FROM events WHERE id = ? AND store_id = ?')
-      .get(eventId, STORE_ID) as { id: string } | undefined;
+    const existingEvent = await queryDb.get<{ id: string }>(
+      'SELECT id FROM events WHERE id = ? AND store_id = ?',
+      [eventId, STORE_ID]
+    );
 
     if (existingEvent) {
       const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId });
@@ -246,47 +247,50 @@ export async function POST(req: NextRequest) {
     };
     const sourceClass = classifySource(referrer, mergedUtm);
 
-    const existingVisitor = db
-      .prepare('SELECT id, consent_state, first_seen_at FROM visitors WHERE id = ? AND store_id = ?')
-      .get(visitorId, STORE_ID) as
-      | { id: string; consent_state: string; first_seen_at: string }
-      | undefined;
+    const existingVisitor = await queryDb.get<{ id: string; consent_state: string; first_seen_at: string }>(
+      'SELECT id, consent_state, first_seen_at FROM visitors WHERE id = ? AND store_id = ?',
+      [visitorId, STORE_ID]
+    );
 
     if (!existingVisitor) {
-      db.prepare(
+      await queryDb.run(
         `INSERT INTO visitors (id, store_id, consent_state, first_seen_at, last_seen_at)
-         VALUES (?, ?, ?, ?, ?)`
-      ).run(visitorId, STORE_ID, consentState, now, now);
+         VALUES (?, ?, ?, ?, ?)`,
+        [visitorId, STORE_ID, consentState, now, now]
+      );
     } else {
       const updateConsent = consentState === 'granted' ? consentState : existingVisitor.consent_state;
-      db.prepare(
-        `UPDATE visitors SET consent_state = ?, last_seen_at = ? WHERE id = ? AND store_id = ?`
-      ).run(updateConsent, now, visitorId, STORE_ID);
+      await queryDb.run(
+        `UPDATE visitors SET consent_state = ?, last_seen_at = ? WHERE id = ? AND store_id = ?`,
+        [updateConsent, now, visitorId, STORE_ID]
+      );
     }
 
-    const existingSession = db
-      .prepare('SELECT id, started_at FROM sessions WHERE id = ? AND store_id = ?')
-      .get(sessionId, STORE_ID) as { id: string; started_at: string } | undefined;
+    const existingSession = await queryDb.get<{ id: string; started_at: string }>(
+      'SELECT id, started_at FROM sessions WHERE id = ? AND store_id = ?',
+      [sessionId, STORE_ID]
+    );
 
     if (!existingSession) {
-      db.prepare(
+      await queryDb.run(
         `INSERT INTO sessions (id, store_id, visitor_id, landing_path, referrer,
                                utm_source, utm_medium, utm_campaign, utm_content, utm_term,
                                source_class, started_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-        sessionId,
-        STORE_ID,
-        visitorId,
-        pagePath,
-        referrer,
-        mergedUtm.utm_source,
-        mergedUtm.utm_medium,
-        mergedUtm.utm_campaign,
-        mergedUtm.utm_content,
-        mergedUtm.utm_term,
-        sourceClass,
-        now
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          sessionId,
+          STORE_ID,
+          visitorId,
+          pagePath,
+          referrer,
+          mergedUtm.utm_source,
+          mergedUtm.utm_medium,
+          mergedUtm.utm_campaign,
+          mergedUtm.utm_content,
+          mergedUtm.utm_term,
+          sourceClass,
+          now,
+        ]
       );
     }
 
@@ -298,95 +302,98 @@ export async function POST(req: NextRequest) {
       const customerName = (props.customer_name as string) || (props.full_name as string) || null;
 
       if (customerEmail || customerPhone) {
-        const existingCustomer = db
-          .prepare(
-            `SELECT id FROM customers WHERE store_id = ? AND (
-               (? IS NOT NULL AND LOWER(email) = LOWER(?)) OR
-               (? IS NOT NULL AND phone = ?)
-             ) LIMIT 1`
-          )
-          .get(
+        const existingCustomer = await queryDb.get<{ id: string }>(
+          `SELECT id FROM customers WHERE store_id = ? AND (
+             (? IS NOT NULL AND LOWER(email) = LOWER(?)) OR
+             (? IS NOT NULL AND phone = ?)
+           ) LIMIT 1`,
+          [
             STORE_ID,
             customerEmail,
             customerEmail || '',
             customerPhone,
-            customerPhone || ''
-          ) as { id: string } | undefined;
+            customerPhone || '',
+          ]
+        );
 
         if (existingCustomer) {
           customerId = existingCustomer.id;
-          db.prepare(
+          await queryDb.run(
             `UPDATE customers SET email = COALESCE(?, email),
                                    phone = COALESCE(?, phone),
                                    full_name = COALESCE(?, full_name),
                                    updated_at = ?
-             WHERE id = ? AND store_id = ?`
-          ).run(customerEmail, customerPhone, customerName, now, customerId, STORE_ID);
+             WHERE id = ? AND store_id = ?`,
+            [customerEmail, customerPhone, customerName, now, customerId, STORE_ID]
+          );
         } else {
           customerId = uuid();
-          db.prepare(
+          await queryDb.run(
             `INSERT INTO customers (id, store_id, email, phone, full_name, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).run(customerId, STORE_ID, customerEmail, customerPhone, customerName, now, now);
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [customerId, STORE_ID, customerEmail, customerPhone, customerName, now, now]
+          );
         }
 
-        const linkExists = db
-          .prepare(
-            'SELECT id FROM identity_links WHERE store_id = ? AND visitor_id = ? AND customer_id = ?'
-          )
-          .get(STORE_ID, visitorId, customerId) as { id: string } | undefined;
+        const linkExists = await queryDb.get<{ id: string }>(
+          'SELECT id FROM identity_links WHERE store_id = ? AND visitor_id = ? AND customer_id = ?',
+          [STORE_ID, visitorId, customerId]
+        );
 
         if (!linkExists) {
-          db.prepare(
+          await queryDb.run(
             `INSERT INTO identity_links (id, store_id, visitor_id, customer_id, linked_via, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)`
-          ).run(
-            uuid(),
-            STORE_ID,
-            visitorId,
-            customerId,
-            eventName === 'login' ? 'login' : eventName === 'signup' ? 'signup' : 'checkout_email',
-            now
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              uuid(),
+              STORE_ID,
+              visitorId,
+              customerId,
+              eventName === 'login' ? 'login' : eventName === 'signup' ? 'signup' : 'checkout_email',
+              now,
+            ]
           );
         }
 
         if (existingSession) {
-          db.prepare(
-            `UPDATE sessions SET customer_id = ? WHERE id = ? AND store_id = ?`
-          ).run(customerId, sessionId, STORE_ID);
+          await queryDb.run(
+            `UPDATE sessions SET customer_id = ? WHERE id = ? AND store_id = ?`,
+            [customerId, sessionId, STORE_ID]
+          );
         }
       }
     }
 
-    db.prepare(
+    await queryDb.run(
       `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at,
                            page_path, referrer, consent_state, schema_version, props_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      eventId,
-      STORE_ID,
-      visitorId,
-      sessionId,
-      customerId,
-      eventName,
-      now,
-      pagePath,
-      referrer,
-      consentState,
-      schemaVersion,
-      propsJson
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        eventId,
+        STORE_ID,
+        visitorId,
+        sessionId,
+        customerId,
+        eventName,
+        now,
+        pagePath,
+        referrer,
+        consentState,
+        schemaVersion,
+        propsJson,
+      ]
     );
 
     if (eventName === 'add_to_cart' && body.props) {
-      handleAddToCart(visitorId, sessionId, customerId, body.props.cart, body.props.item, now);
+      await handleAddToCart(visitorId, sessionId, customerId, body.props.cart, body.props.item, now);
     }
 
     if (eventName === 'begin_checkout' && body.props) {
-      handleBeginCheckout(visitorId, sessionId, customerId, body.props.cart_id, now);
+      await handleBeginCheckout(visitorId, sessionId, customerId, body.props.cart_id, now);
     }
 
     if (eventName === 'purchase' && body.props) {
-      handlePurchase(visitorId, sessionId, customerId, body.props, now);
+      await handlePurchase(visitorId, sessionId, customerId, body.props, now);
     }
 
     const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId });
@@ -434,7 +441,7 @@ export async function OPTIONS(req: NextRequest) {
   return response;
 }
 
-function handleAddToCart(
+async function handleAddToCart(
   visitorId: string,
   sessionId: string,
   customerId: string | null,
@@ -467,29 +474,31 @@ function handleAddToCart(
       }
     }
 
-    const existingCart = db
-      .prepare('SELECT id FROM carts WHERE id = ? AND store_id = ?')
-      .get(cartId, STORE_ID) as { id: string } | undefined;
+    const existingCart = await queryDb.get<{ id: string }>(
+      'SELECT id FROM carts WHERE id = ? AND store_id = ?',
+      [cartId, STORE_ID]
+    );
 
     if (!existingCart) {
-      db.prepare(
+      await queryDb.run(
         `INSERT INTO carts (id, store_id, visitor_id, customer_id, session_id, status,
                             total_regular_cents, total_member_cents, discount_cents, currency,
                             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'active', ?, ?, 0, 'UGX', ?, ?)`
-      ).run(
-        cartId,
-        STORE_ID,
-        visitorId,
-        customerId,
-        sessionId,
-        totalRegular,
-        totalMember,
-        now,
-        now
+         VALUES (?, ?, ?, ?, ?, 'active', ?, ?, 0, 'UGX', ?, ?)`,
+        [
+          cartId,
+          STORE_ID,
+          visitorId,
+          customerId,
+          sessionId,
+          totalRegular,
+          totalMember,
+          now,
+          now,
+        ]
       );
     } else {
-      db.prepare(
+      await queryDb.run(
         `UPDATE carts SET visitor_id = COALESCE(?, visitor_id),
                           customer_id = COALESCE(?, customer_id),
                           session_id = COALESCE(?, session_id),
@@ -497,45 +506,49 @@ function handleAddToCart(
                           total_regular_cents = ?,
                           total_member_cents = ?,
                           updated_at = ?
-         WHERE id = ? AND store_id = ?`
-      ).run(visitorId, customerId, sessionId, totalRegular, totalMember, now, cartId, STORE_ID);
+         WHERE id = ? AND store_id = ?`,
+        [visitorId, customerId, sessionId, totalRegular, totalMember, now, cartId, STORE_ID]
+      );
     }
 
-    const deleteOldItems = db.prepare(
-      `DELETE FROM cart_items WHERE cart_id = ? AND store_id = ?`
-    );
-    deleteOldItems.run(cartId, STORE_ID);
-
-    const insertItem = db.prepare(
-      `INSERT INTO cart_items (id, store_id, cart_id, product_id, product_slug, product_name,
-                               variant_name, qty, unit_price_cents, member_price_cents, cogs_cents, added_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    await queryDb.run(
+      `DELETE FROM cart_items WHERE cart_id = ? AND store_id = ?`,
+      [cartId, STORE_ID]
     );
 
+    const statements: Array<{ sql: string; params?: unknown[] }> = [];
     for (const it of items) {
       const productId = it.product_id || (it.product_slug ? `prod_${it.product_slug}` : uuid());
       const qty = typeof it.qty === 'number' ? Math.max(1, Math.floor(it.qty)) : 1;
-      insertItem.run(
-        uuid(),
-        STORE_ID,
-        cartId,
-        productId,
-        it.product_slug || 'unknown',
-        it.product_name || 'Unknown Product',
-        it.variant_name || null,
-        qty,
-        typeof it.unit_price_cents === 'number' ? it.unit_price_cents : 0,
-        typeof it.member_price_cents === 'number' ? it.member_price_cents : null,
-        typeof it.cogs_cents === 'number' ? it.cogs_cents : Math.floor((it.unit_price_cents || 0) * 0.45),
-        now
-      );
+      statements.push({
+        sql: `INSERT INTO cart_items (id, store_id, cart_id, product_id, product_slug, product_name,
+                                       variant_name, qty, unit_price_cents, member_price_cents, cogs_cents, added_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        params: [
+          uuid(),
+          STORE_ID,
+          cartId,
+          productId,
+          it.product_slug || 'unknown',
+          it.product_name || 'Unknown Product',
+          it.variant_name || null,
+          qty,
+          typeof it.unit_price_cents === 'number' ? it.unit_price_cents : 0,
+          typeof it.member_price_cents === 'number' ? it.member_price_cents : null,
+          typeof it.cogs_cents === 'number' ? it.cogs_cents : Math.floor((it.unit_price_cents || 0) * 0.45),
+          now,
+        ],
+      });
+    }
+    if (statements.length) {
+      await queryDb.batch(statements);
     }
   } catch {
     // swallow - never fail the event for cart side effects
   }
 }
 
-function handleBeginCheckout(
+async function handleBeginCheckout(
   visitorId: string,
   sessionId: string,
   customerId: string | null,
@@ -546,16 +559,17 @@ function handleBeginCheckout(
     const cartId = typeof cartIdArg === 'string' ? cartIdArg : uuid();
     const checkoutId = uuid();
 
-    db.prepare(
+    await queryDb.run(
       `INSERT INTO checkouts (id, store_id, cart_id, visitor_id, customer_id, session_id, status, started_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'started', ?)`
-    ).run(checkoutId, STORE_ID, cartId, visitorId, customerId, sessionId, now);
+       VALUES (?, ?, ?, ?, ?, ?, 'started', ?)`,
+      [checkoutId, STORE_ID, cartId, visitorId, customerId, sessionId, now]
+    );
   } catch {
     // swallow
   }
 }
 
-function handlePurchase(
+async function handlePurchase(
   visitorId: string,
   sessionId: string,
   customerId: string | null,
@@ -648,7 +662,7 @@ function handlePurchase(
     const mergedUtm = parseUtmParams(props.utm as Record<string, unknown> | undefined);
     const sourceClass = typeof props.source_class === 'string' ? props.source_class : null;
 
-    db.prepare(
+    await queryDb.run(
       `INSERT INTO orders (id, store_id, checkout_id, cart_id, visitor_id, customer_id, session_id,
                            order_number, status, customer_email, customer_phone, customer_name,
                            shipping_address_json, gross_sales_cents, discount_cents, refund_cents,
@@ -662,87 +676,92 @@ function handlePurchase(
                ?, ?, ?, ?,
                ?, ?, ?, ?,
                ?, ?, ?, ?,
-               ?, ?, ?)`
-    ).run(
-      orderId,
-      STORE_ID,
-      checkoutId,
-      cartId,
-      visitorId,
-      customerId,
-      sessionId,
-      orderNumber,
-      customerEmail,
-      customerPhone,
-      customerName,
-      shippingAddressJson,
-      grossSales,
-      discountCents,
-      shippingCents,
-      taxCents,
-      netSales,
-      totalCogs,
-      grossProfit,
-      paymentMethod,
-      paymentFee,
-      'UGX',
-      sourceClass,
-      mergedUtm.utm_source,
-      mergedUtm.utm_medium,
-      mergedUtm.utm_campaign,
-      now,
-      now,
-      now
-    );
-
-    const insertOrderItem = db.prepare(
-      `INSERT INTO order_items (id, store_id, order_id, product_id, product_slug, product_name,
-                                variant_name, qty, unit_price_cents, member_price_cents,
-                                discount_cents, gross_sales_cents, net_sales_cents, refund_cents,
-                                cogs_cents_snapshot, gross_profit_cents)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
-    );
-
-    for (const row of orderItemRows) {
-      insertOrderItem.run(
-        row.id,
-        STORE_ID,
+               ?, ?, ?)`,
+      [
         orderId,
-        row.product_id,
-        row.product_slug,
-        row.product_name,
-        row.variant_name,
-        row.qty,
-        row.unit_price_cents,
-        row.member_price_cents,
-        row.line_discount,
-        row.line_gross,
-        row.line_net,
-        row.line_cogs,
-        row.line_profit
-      );
+        STORE_ID,
+        checkoutId,
+        cartId,
+        visitorId,
+        customerId,
+        sessionId,
+        orderNumber,
+        customerEmail,
+        customerPhone,
+        customerName,
+        shippingAddressJson,
+        grossSales,
+        discountCents,
+        shippingCents,
+        taxCents,
+        netSales,
+        totalCogs,
+        grossProfit,
+        paymentMethod,
+        paymentFee,
+        'UGX',
+        sourceClass,
+        mergedUtm.utm_source,
+        mergedUtm.utm_medium,
+        mergedUtm.utm_campaign,
+        now,
+        now,
+        now,
+      ]
+    );
+
+    const itemStatements: Array<{ sql: string; params?: unknown[] }> = [];
+    for (const row of orderItemRows) {
+      itemStatements.push({
+        sql: `INSERT INTO order_items (id, store_id, order_id, product_id, product_slug, product_name,
+                                       variant_name, qty, unit_price_cents, member_price_cents,
+                                       discount_cents, gross_sales_cents, net_sales_cents, refund_cents,
+                                       cogs_cents_snapshot, gross_profit_cents)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        params: [
+          row.id,
+          STORE_ID,
+          orderId,
+          row.product_id,
+          row.product_slug,
+          row.product_name,
+          row.variant_name,
+          row.qty,
+          row.unit_price_cents,
+          row.member_price_cents,
+          row.line_discount,
+          row.line_gross,
+          row.line_net,
+          row.line_cogs,
+          row.line_profit,
+        ],
+      });
+    }
+    if (itemStatements.length) {
+      await queryDb.batch(itemStatements);
     }
 
     if (cartId) {
-      db.prepare(
-        `UPDATE carts SET status = 'converted', updated_at = ? WHERE id = ? AND store_id = ?`
-      ).run(now, cartId, STORE_ID);
+      await queryDb.run(
+        `UPDATE carts SET status = 'converted', updated_at = ? WHERE id = ? AND store_id = ?`,
+        [now, cartId, STORE_ID]
+      );
     }
 
     if (customerId) {
-      const custStats = db
-        .prepare(
-          `SELECT COALESCE(SUM(net_sales_cents),0) AS spent, COUNT(*) AS cnt
-           FROM orders WHERE store_id = ? AND customer_id = ?`
-        )
-        .get(STORE_ID, customerId) as { spent: number; cnt: number } | undefined;
+      const custStats = await queryDb.get<{ spent: number; cnt: number }>(
+        `SELECT COALESCE(SUM(net_sales_cents),0) AS spent, COUNT(*) AS cnt
+         FROM orders WHERE store_id = ? AND customer_id = ?`,
+        [STORE_ID, customerId]
+      );
       const spent = custStats?.spent ?? netSales;
       const cnt = custStats?.cnt ?? 1;
-      db.prepare(
+      await queryDb.run(
         `UPDATE customers SET total_orders = ?, total_spent_cents = ?, last_order_at = ?,
                               first_order_at = COALESCE(first_order_at, ?), updated_at = ?
-         WHERE id = ? AND store_id = ?`
-      ).run(cnt, spent, now, now, now, customerId, STORE_ID);
+         WHERE id = ? AND store_id = ?`,
+        [cnt, spent, now, now, now, customerId, STORE_ID]
+      );
     }
   } catch {
     // swallow - never fail event for purchase side effects
