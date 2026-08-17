@@ -53,9 +53,9 @@ export function setSessionCookie(
 ): NextResponse {
   response.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
+    secure: true, // always set on Vercel/HTTPS; browsers ignore on localhost
+    sameSite: "lax",
+    path: "/",
     maxAge: 60 * 60 * 24,
   });
   return response;
@@ -64,9 +64,9 @@ export function setSessionCookie(
 export function clearSessionCookie(response: NextResponse): NextResponse {
   response.cookies.set(SESSION_COOKIE, '', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
+    secure: true,
+    sameSite: "lax",
+    path: "/",
     maxAge: 0,
     expires: new Date(0),
   });

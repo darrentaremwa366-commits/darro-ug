@@ -2,8 +2,7 @@ import './db-init';
 import type { Metadata } from "next";
 import { Instrument_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import PublicChrome from "@/components/PublicChrome";
-import Providers from "@/app/providers";
+import RouteAwareChrome from "@/app/_chrome";
 
 const instrumentSans = Instrument_Sans({
   variable: "--font-heading",
@@ -32,9 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${instrumentSans.variable} ${inter.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-[family-name:var(--font-body)]">
-        <Providers>
-          <PublicChrome>{children}</PublicChrome>
-        </Providers>
+        <RouteAwareChrome>{children}</RouteAwareChrome>
       </body>
     </html>
   );

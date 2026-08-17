@@ -27,9 +27,15 @@ export default function AdminLogin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "include",
       });
 
-      const data = await res.json();
+      let data: { ok?: boolean; redirect?: string; error?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        /* non-JSON response — fall through to status-based check */
+      }
 
       if (!res.ok || !data.ok) {
         setError(data.error || "Invalid credentials");
@@ -37,9 +43,16 @@ export default function AdminLogin() {
         return;
       }
 
-      router.push(data.redirect || redirectFrom);
-      router.refresh();
-    } catch {
+      // Use a full page navigation (not client router push) to force a clean
+      // round-trip. This guarantees:
+      //   1) the Set-Cookie header is actually persisted in the browser,
+      //   2) the admin page starts with a fresh server render with the auth
+      //      cookie attached, and
+      //   3) we avoid any client-router / hydration bug that produces the
+      //      black screen immediately after login.
+      const destination = data.redirect || redirectFrom;
+      window.location.assign(destination);
+    } catch (err) {
       setError("Something went wrong. Please try again.");
       setLoading(false);
     }
