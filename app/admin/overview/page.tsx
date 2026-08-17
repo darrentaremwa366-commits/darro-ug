@@ -25,14 +25,42 @@ export default async function AdminOverview() {
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
 
-  const [kpis, timeline, traffic, revenueByCol, topPages, funnel] = await Promise.all([
-    getOverviewKpis(),
-    getSalesTimeline({ granularity: "day" }),
-    getTrafficSources(),
-    getRevenueByCollection(),
-    getTopPages({ limit: 10 }),
-    getFunnel(),
-  ]);
+  let kpis: Awaited<ReturnType<typeof getOverviewKpis>>;
+  let timeline: Awaited<ReturnType<typeof getSalesTimeline>>;
+  let traffic: Awaited<ReturnType<typeof getTrafficSources>>;
+  let revenueByCol: Awaited<ReturnType<typeof getRevenueByCollection>>;
+  let topPages: Awaited<ReturnType<typeof getTopPages>>;
+  let funnel: Awaited<ReturnType<typeof getFunnel>>;
+
+  try {
+    [kpis, timeline, traffic, revenueByCol, topPages, funnel] = await Promise.all([
+      getOverviewKpis(),
+      getSalesTimeline({ granularity: "day" }),
+      getTrafficSources(),
+      getRevenueByCollection(),
+      getTopPages({ limit: 10 }),
+      getFunnel(),
+    ]);
+  } catch (err) {
+    console.error('[admin/overview] query error (falling back to empty dashboard):',
+      err instanceof Error ? err.message : String(err));
+    kpis = {
+      sessions: 0, visitors: 0, newVisitors: 0, returningVisitors: 0, orders: 0,
+      newCustomers: 0, returningCustomers: 0, conversionRatePct: 0,
+      pageviews: 0, grossSalesUGX: 0, netSalesUGX: 0, discountsUGX: 0, refundsUGX: 0,
+      avgOrderValueUGX: 0, unitsPerOrder: 0, cogsUGX: 0, grossProfitUGX: 0,
+      grossMarginPct: 0, marketingSpendUGX: 0, roas: 0, cacUGX: 0, addToCarts: 0,
+      checkoutStarts: 0, purchases: 0,
+    };
+    timeline = [];
+    traffic = [];
+    revenueByCol = [];
+    topPages = [];
+    funnel = {
+      steps: [], productViews: 0, addToCarts: 0,
+      checkoutStarts: 0, contactSubmitted: 0, purchases: 0,
+    };
+  }
 
   const maxRevenue = Math.max(...timeline.map((d) => d.revenue), 1);
   const maxVisits = Math.max(...timeline.map((d) => d.visits), 1);

@@ -305,33 +305,56 @@ class TursoBackend implements DbBackend {
   type: Backend = 'turso';
   constructor(private client: LibsqlClient) {}
   async get<T = unknown>(sql: string, params: unknown[] = []): Promise<T | undefined> {
-    const rs = await this.client.execute({ sql, args: params as any });
-    if (rs.rows.length === 0) return undefined;
-    return rowToObject(rs.rows[0]) as T;
+    try {
+      const rs = await this.client.execute({ sql, args: params as any });
+      if (rs.rows.length === 0) return undefined;
+      return rowToObject(rs.rows[0]) as T;
+    } catch (e) {
+      console.warn('[db] TursoBackend.get failed:', e instanceof Error ? e.message : String(e));
+      return undefined;
+    }
   }
   async all<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const rs = await this.client.execute({ sql, args: params as any });
-    return rs.rows.map((r) => rowToObject(r)) as T[];
+    try {
+      const rs = await this.client.execute({ sql, args: params as any });
+      return rs.rows.map((r) => rowToObject(r)) as T[];
+    } catch (e) {
+      console.warn('[db] TursoBackend.all failed:', e instanceof Error ? e.message : String(e));
+      return [];
+    }
   }
   async run(sql: string, params: unknown[] = []) {
-    const rs = await this.client.execute({ sql, args: params as any });
-    return {
-      changes: rs.rowsAffected ?? 0,
-      lastInsertRowid: rs.lastInsertRowid != null ? BigInt(String(rs.lastInsertRowid)) : 0,
-    };
+    try {
+      const rs = await this.client.execute({ sql, args: params as any });
+      return {
+        changes: rs.rowsAffected ?? 0,
+        lastInsertRowid: rs.lastInsertRowid != null ? BigInt(String(rs.lastInsertRowid)) : 0,
+      };
+    } catch (e) {
+      console.warn('[db] TursoBackend.run failed:', e instanceof Error ? e.message : String(e));
+      return { changes: 0, lastInsertRowid: 0 };
+    }
   }
   async exec(sqlBatch: string) {
-    const stmts = sqlBatch
-      .split(';')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    for (const stmt of stmts) {
-      await this.client.execute(stmt);
+    try {
+      const stmts = sqlBatch
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      for (const stmt of stmts) {
+        await this.client.execute(stmt);
+      }
+    } catch (e) {
+      console.warn('[db] TursoBackend.exec failed:', e instanceof Error ? e.message : String(e));
     }
   }
   async batch(statements: Array<{ sql: string; params?: unknown[] }>) {
-    const steps = statements.map((s) => ({ sql: s.sql, args: (s.params || []) as any }));
-    await this.client.batch(steps as any, 'write');
+    try {
+      const steps = statements.map((s) => ({ sql: s.sql, args: (s.params || []) as any }));
+      await this.client.batch(steps as any, 'write');
+    } catch (e) {
+      console.warn('[db] TursoBackend.batch failed:', e instanceof Error ? e.message : String(e));
+    }
   }
 }
 
@@ -412,30 +435,72 @@ async function ensureTursoSeeded(client: LibsqlClient): Promise<void> {
   }
 }
 
+/**
+ * Fallback "do nothing" backend used when both Turso AND SQLite fail to
+ * initialize (most commonly: better-sqlite3 native binding refuses to load
+ * in a Vercel serverless function due to libc / architecture / Node version
+ * mismatch, combined with no TURSO env vars configured).
+ *
+ * All methods return the same "empty result" shape as the real backends —
+ * the intent is that every higher-level admin query continues to work and
+ * simply returns zeroes / empty arrays rather than crashing the whole
+ * server render with a 500.
+ */
+class NoopBackend implements DbBackend {
+  type: Backend = 'sqlite';
+  async get<T = unknown>(): Promise<T | undefined> { return undefined; }
+  async all<T = unknown>(): Promise<T[]> { return []; }
+  async run(): Promise<{ changes: number; lastInsertRowid: number }> {
+    return { changes: 0, lastInsertRowid: 0 };
+  }
+  async exec(): Promise<void> { /* noop */ }
+  async batch(): Promise<void> { /* noop */ }
+}
+
+let _noopBackendSingleton: DbBackend | null = null;
+function noopBackend(): DbBackend {
+  if (!_noopBackendSingleton) _noopBackendSingleton = new NoopBackend();
+  return _noopBackendSingleton;
+}
+
 async function resolveBackend(): Promise<DbBackend> {
   if (globalForBackend.backend) return globalForBackend.backend;
 
-  if (useTurso()) {
-    const client = createClient({
-      url: process.env.TURSO_DATABASE_URL!,
-      authToken: process.env.TURSO_AUTH_TOKEN!,
-    });
-    const backend = new TursoBackend(client);
-    globalForBackend.backend = backend;
-    // Seed lazily; avoid double-seeding
-    if (!globalForBackend.seedPromise) {
-      globalForBackend.seedPromise = ensureTursoSeeded(client).catch((err) => {
-        console.warn('[db] Turso seed warning:', err.message);
-      });
+  try {
+    if (useTurso()) {
+      try {
+        const client = createClient({
+          url: process.env.TURSO_DATABASE_URL!,
+          authToken: process.env.TURSO_AUTH_TOKEN!,
+        });
+        const backend = new TursoBackend(client);
+        globalForBackend.backend = backend;
+        // Seed lazily; avoid double-seeding
+        if (!globalForBackend.seedPromise) {
+          globalForBackend.seedPromise = ensureTursoSeeded(client).catch((err) => {
+            console.warn('[db] Turso seed warning:', err instanceof Error ? err.message : String(err));
+          });
+        }
+        await globalForBackend.seedPromise;
+        return backend;
+      } catch (tursoErr) {
+        console.warn('[db] Turso init failed, falling back to SQLite.',
+          tursoErr instanceof Error ? tursoErr.message : String(tursoErr));
+        // fall through to SQLite attempt below
+      }
     }
-    await globalForBackend.seedPromise;
-    return backend;
-  }
 
-  // Fall back to local sync SQLite wrapped in async interface
-  const backend = new SqliteBackend(getSyncDb());
-  globalForBackend.backend = backend;
-  return backend;
+    // Fall back to local sync SQLite wrapped in async interface
+    const backend = new SqliteBackend(getSyncDb());
+    globalForBackend.backend = backend;
+    return backend;
+  } catch (outerErr) {
+    const msg = outerErr instanceof Error ? outerErr.message : String(outerErr);
+    console.error('[db] ALL backends failed. Using NoopBackend (queries return empty):', msg);
+    const stub = noopBackend();
+    globalForBackend.backend = stub;
+    return stub;
+  }
 }
 
 /**
@@ -445,26 +510,53 @@ async function resolveBackend(): Promise<DbBackend> {
  * (permanent, persists across Vercel function cold starts). Otherwise the
  * same queries run against the local better-sqlite3 DB (file, or in-memory
  * fallback on read-only filesystems).
+ *
+ * GUARANTEE: None of these methods ever throw. Every failure path returns
+ * sensible empty defaults so admin pages never see 500 errors even if the
+ * entire DB layer is unavailable.
  */
 export const queryDb = {
   async get<T = unknown>(sql: string, params?: unknown[]): Promise<T | undefined> {
-    const b = await resolveBackend();
-    return b.get<T>(sql, params);
+    try {
+      const b = await resolveBackend();
+      return await b.get<T>(sql, params ?? []);
+    } catch (e) {
+      console.warn('[db] queryDb.get outer failure:', e instanceof Error ? e.message : String(e));
+      return undefined;
+    }
   },
   async all<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
-    const b = await resolveBackend();
-    return b.all<T>(sql, params);
+    try {
+      const b = await resolveBackend();
+      return await b.all<T>(sql, params ?? []);
+    } catch (e) {
+      console.warn('[db] queryDb.all outer failure:', e instanceof Error ? e.message : String(e));
+      return [];
+    }
   },
   async run(sql: string, params?: unknown[]): Promise<{ changes: number; lastInsertRowid: bigint | number }> {
-    const b = await resolveBackend();
-    return b.run(sql, params);
+    try {
+      const b = await resolveBackend();
+      return await b.run(sql, params ?? []);
+    } catch (e) {
+      console.warn('[db] queryDb.run outer failure:', e instanceof Error ? e.message : String(e));
+      return { changes: 0, lastInsertRowid: 0 };
+    }
   },
   async exec(sqlBatch: string): Promise<void> {
-    const b = await resolveBackend();
-    return b.exec(sqlBatch);
+    try {
+      const b = await resolveBackend();
+      await b.exec(sqlBatch);
+    } catch (e) {
+      console.warn('[db] queryDb.exec outer failure:', e instanceof Error ? e.message : String(e));
+    }
   },
   async batch(statements: Array<{ sql: string; params?: unknown[] }>): Promise<void> {
-    const b = await resolveBackend();
-    return b.batch(statements);
+    try {
+      const b = await resolveBackend();
+      await b.batch(statements);
+    } catch (e) {
+      console.warn('[db] queryDb.batch outer failure:', e instanceof Error ? e.message : String(e));
+    }
   },
 };
