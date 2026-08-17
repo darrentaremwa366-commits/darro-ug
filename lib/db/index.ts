@@ -79,117 +79,29 @@ function loadProductsFromDisk(): SeedProductsItem[] {
 }
 
 const _IN_MEMORY_SCHEMA_FALLBACK = `
-CREATE TABLE IF NOT EXISTS stores (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
-  timezone TEXT NOT NULL DEFAULT 'Africa/Kampala',
-  currency TEXT NOT NULL DEFAULT 'UGX',
-  settings_json TEXT NOT NULL DEFAULT '{}',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS admin_users (
-  id TEXT PRIMARY KEY,
-  store_id TEXT NOT NULL,
-  email TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'staff',
-  full_name TEXT,
-  last_login_at TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE(store_id, email)
-);
-CREATE TABLE IF NOT EXISTS products (
-  id TEXT PRIMARY KEY,
-  store_id TEXT NOT NULL,
-  external_id TEXT,
-  slug TEXT NOT NULL,
-  name TEXT NOT NULL,
-  sku TEXT,
-  collection TEXT,
-  active INTEGER NOT NULL DEFAULT 1,
-  regular_price_cents INTEGER NOT NULL,
-  member_price_cents INTEGER,
-  cogs_cents INTEGER,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  UNIQUE(store_id, slug)
-);
-CREATE TABLE IF NOT EXISTS orders (
-  id TEXT PRIMARY KEY,
-  store_id TEXT NOT NULL,
-  order_number TEXT NOT NULL,
-  customer_name TEXT,
-  customer_email TEXT,
-  customer_phone TEXT,
-  status TEXT NOT NULL DEFAULT 'pending',
-  total_cents INTEGER NOT NULL,
-  items_json TEXT NOT NULL,
-  shipping_address_json TEXT,
-  notes TEXT,
-  checkout_channel TEXT NOT NULL DEFAULT 'whatsapp',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS visitors (
-  id TEXT PRIMARY KEY,
-  store_id TEXT NOT NULL,
-  first_seen_at TEXT NOT NULL,
-  last_seen_at TEXT NOT NULL,
-  country TEXT,
-  city TEXT,
-  device_type TEXT,
-  utm_source TEXT,
-  utm_medium TEXT,
-  utm_campaign TEXT,
-  referrer_host TEXT
-);
-CREATE TABLE IF NOT EXISTS events (
-  id TEXT PRIMARY KEY,
-  store_id TEXT NOT NULL,
-  visitor_id TEXT,
-  session_id TEXT,
-  event_type TEXT NOT NULL,
-  path TEXT,
-  product_id TEXT,
-  order_id TEXT,
-  revenue_cents INTEGER,
-  referrer TEXT,
-  user_agent TEXT,
-  ip_address TEXT,
-  created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS admin_audit_log (
-  id TEXT PRIMARY KEY,
-  store_id TEXT NOT NULL,
-  admin_user_id TEXT,
-  action TEXT NOT NULL,
-  resource_type TEXT,
-  resource_id TEXT,
-  details_json TEXT,
-  ip_address TEXT,
-  user_agent TEXT,
-  created_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS campaigns (
-  id TEXT PRIMARY KEY,
-  store_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  channel TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'draft',
-  audience_size INTEGER NOT NULL DEFAULT 0,
-  budget_cents INTEGER,
-  utm_source TEXT,
-  utm_medium TEXT,
-  utm_campaign TEXT,
-  target_date TEXT,
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_events_store_created ON events(store_id, created_at);
+CREATE TABLE IF NOT EXISTS stores (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, timezone TEXT NOT NULL DEFAULT 'Africa/Kampala', currency TEXT NOT NULL DEFAULT 'UGX', settings_json TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS admin_users (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, email TEXT NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('owner','analyst','marketer','support')), full_name TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(store_id, email));
+CREATE TABLE IF NOT EXISTS visitors (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, consent_state TEXT DEFAULT 'pending', first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL, device_type TEXT, os_name TEXT, browser_name TEXT, country_code TEXT);
+CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, visitor_id TEXT NOT NULL, customer_id TEXT, landing_path TEXT, referrer TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, utm_content TEXT, utm_term TEXT, source_class TEXT, first_touch_campaign_id TEXT, last_touch_campaign_id TEXT, started_at TEXT NOT NULL, ended_at TEXT);
+CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, email TEXT, email_hash TEXT, phone TEXT, phone_hash TEXT, full_name TEXT, first_order_at TEXT, last_order_at TEXT, total_orders INTEGER NOT NULL DEFAULT 0, total_spent_cents INTEGER NOT NULL DEFAULT 0, encrypted_pii TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS identity_links (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, visitor_id TEXT NOT NULL, customer_id TEXT NOT NULL, linked_via TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, visitor_id TEXT NOT NULL, session_id TEXT NOT NULL, customer_id TEXT, event_name TEXT NOT NULL, created_at TEXT NOT NULL, page_path TEXT, referrer TEXT, consent_state TEXT DEFAULT 'pending', schema_version INTEGER NOT NULL DEFAULT 1, props_json TEXT);
+CREATE TABLE IF NOT EXISTS carts (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, visitor_id TEXT, customer_id TEXT, session_id TEXT, status TEXT NOT NULL DEFAULT 'active', total_regular_cents INTEGER NOT NULL DEFAULT 0, total_member_cents INTEGER NOT NULL DEFAULT 0, discount_cents INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'UGX', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, abandoned_at TEXT);
+CREATE TABLE IF NOT EXISTS cart_items (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, cart_id TEXT NOT NULL, product_id TEXT NOT NULL, product_slug TEXT NOT NULL, product_name TEXT NOT NULL, variant_name TEXT, qty INTEGER NOT NULL, unit_price_cents INTEGER NOT NULL, member_price_cents INTEGER, cogs_cents INTEGER NOT NULL DEFAULT 0, added_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS checkouts (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, cart_id TEXT, visitor_id TEXT, customer_id TEXT, session_id TEXT, status TEXT NOT NULL DEFAULT 'started', contact_email TEXT, contact_phone TEXT, recovery_status TEXT, started_at TEXT NOT NULL, contact_submitted_at TEXT, completed_at TEXT, abandoned_at TEXT);
+CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, checkout_id TEXT, cart_id TEXT, visitor_id TEXT, customer_id TEXT, session_id TEXT, order_number TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'new', customer_email TEXT, customer_phone TEXT, customer_name TEXT, shipping_address_json TEXT, gross_sales_cents INTEGER NOT NULL DEFAULT 0, discount_cents INTEGER NOT NULL DEFAULT 0, refund_cents INTEGER NOT NULL DEFAULT 0, shipping_cents INTEGER NOT NULL DEFAULT 0, tax_cents INTEGER NOT NULL DEFAULT 0, net_sales_cents INTEGER NOT NULL DEFAULT 0, total_cogs_cents INTEGER NOT NULL DEFAULT 0, gross_profit_cents INTEGER NOT NULL DEFAULT 0, payment_method TEXT, payment_fee_cents INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'UGX', first_touch_campaign_id TEXT, last_touch_campaign_id TEXT, source_class TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT);
+CREATE TABLE IF NOT EXISTS order_items (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, order_id TEXT NOT NULL, product_id TEXT NOT NULL, product_slug TEXT NOT NULL, product_name TEXT NOT NULL, variant_name TEXT, qty INTEGER NOT NULL, unit_price_cents INTEGER NOT NULL, member_price_cents INTEGER, discount_cents INTEGER NOT NULL DEFAULT 0, gross_sales_cents INTEGER NOT NULL DEFAULT 0, net_sales_cents INTEGER NOT NULL DEFAULT 0, refund_cents INTEGER NOT NULL DEFAULT 0, cogs_cents_snapshot INTEGER NOT NULL DEFAULT 0, gross_profit_cents INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, external_id TEXT, slug TEXT NOT NULL, name TEXT NOT NULL, sku TEXT, collection TEXT, active INTEGER NOT NULL DEFAULT 1, regular_price_cents INTEGER NOT NULL, member_price_cents INTEGER, cogs_cents INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(store_id, slug));
+CREATE TABLE IF NOT EXISTS inventory_costs (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, product_id TEXT NOT NULL, cogs_cents INTEGER NOT NULL, effective_from TEXT NOT NULL, effective_to TEXT);
+CREATE TABLE IF NOT EXISTS campaigns (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, name TEXT NOT NULL, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, utm_content TEXT, utm_term TEXT, landing_url TEXT, created_by TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS attribution_touches (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, visitor_id TEXT NOT NULL, session_id TEXT NOT NULL, customer_id TEXT, order_id TEXT, campaign_id TEXT, touch_type TEXT NOT NULL, conversion_window_hours INTEGER, touched_at TEXT NOT NULL, source_class TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, referrer_host TEXT);
+CREATE TABLE IF NOT EXISTS marketing_spend (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, campaign_id TEXT, spend_date TEXT NOT NULL, platform TEXT NOT NULL, campaign_name TEXT, spend_cents INTEGER NOT NULL, currency TEXT NOT NULL DEFAULT 'UGX', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS admin_audit_log (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, admin_user_id TEXT, action TEXT NOT NULL, resource_type TEXT, resource_id TEXT, details_json TEXT, ip_address TEXT, user_agent TEXT, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS data_deletion_requests (id TEXT PRIMARY KEY, store_id TEXT NOT NULL, customer_identifier TEXT NOT NULL, customer_id TEXT, status TEXT NOT NULL DEFAULT 'pending', requested_at TEXT NOT NULL, completed_at TEXT, notes TEXT);
+CREATE INDEX IF NOT EXISTS idx_events_store_time ON events(store_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_events_name ON events(store_id, event_name, created_at);
+CREATE INDEX IF NOT EXISTS idx_events_visitor ON events(visitor_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_store_created ON orders(store_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_products_store_active ON products(store_id, active);
 CREATE INDEX IF NOT EXISTS idx_visitors_store_first ON visitors(store_id, first_seen_at);
@@ -344,25 +256,48 @@ class SqliteBackend implements DbBackend {
   type: Backend = 'sqlite';
   constructor(private sqlite: Database.Database) {}
   async get<T = unknown>(sql: string, params: unknown[] = []): Promise<T | undefined> {
-    return this.sqlite.prepare(sql).get(...params) as T | undefined;
+    try {
+      return this.sqlite.prepare(sql).get(...params) as T | undefined;
+    } catch (e) {
+      console.warn('[db] SqliteBackend.get failed:', e instanceof Error ? e.message : String(e));
+      return undefined;
+    }
   }
   async all<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
-    return this.sqlite.prepare(sql).all(...params) as T[];
+    try {
+      return this.sqlite.prepare(sql).all(...params) as T[];
+    } catch (e) {
+      console.warn('[db] SqliteBackend.all failed:', e instanceof Error ? e.message : String(e));
+      return [];
+    }
   }
   async run(sql: string, params: unknown[] = []) {
-    const info = this.sqlite.prepare(sql).run(...params);
-    return { changes: info.changes, lastInsertRowid: Number(info.lastInsertRowid) };
+    try {
+      const info = this.sqlite.prepare(sql).run(...params);
+      return { changes: info.changes, lastInsertRowid: Number(info.lastInsertRowid) };
+    } catch (e) {
+      console.warn('[db] SqliteBackend.run failed:', e instanceof Error ? e.message : String(e));
+      return { changes: 0, lastInsertRowid: 0 };
+    }
   }
   async exec(sqlBatch: string) {
-    this.sqlite.exec(sqlBatch);
+    try {
+      this.sqlite.exec(sqlBatch);
+    } catch (e) {
+      console.warn('[db] SqliteBackend.exec failed:', e instanceof Error ? e.message : String(e));
+    }
   }
   async batch(statements: Array<{ sql: string; params?: unknown[] }>) {
-    const tx = this.sqlite.transaction((stmts: typeof statements) => {
-      for (const s of stmts) {
-        this.sqlite.prepare(s.sql).run(...(s.params || []));
-      }
-    });
-    tx(statements);
+    try {
+      const tx = this.sqlite.transaction((stmts: typeof statements) => {
+        for (const s of stmts) {
+          this.sqlite.prepare(s.sql).run(...(s.params || []));
+        }
+      });
+      tx(statements);
+    } catch (e) {
+      console.warn('[db] SqliteBackend.batch failed:', e instanceof Error ? e.message : String(e));
+    }
   }
 }
 
