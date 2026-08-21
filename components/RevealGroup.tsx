@@ -18,7 +18,7 @@ export default function RevealGroup({
     <motion.div
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, margin: "-80px" }}
+      viewport={{ once: false, margin: "-80px" }}
       variants={{
         hidden: {},
         visible: {

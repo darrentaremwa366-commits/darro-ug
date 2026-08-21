@@ -40,6 +40,17 @@ function getProjectRoot(): string {
 }
 
 function getDataDir(): string {
+  // On Vercel serverless (or any serverless where cwd/project is read-only)
+  // we MUST write to /tmp because the deployed source directory is mounted
+  // read-only. Without this, ALL analytics/admin writes silently fail into
+  // the NoopBackend and the dashboard shows zeroes forever.
+  if (process.env.VERCEL || process.env.DARRO_DB_USE_TMP) {
+    const tmpDir = process.env.DARRO_DB_TMP_DIR || '/tmp/darro-db';
+    if (!fs.existsSync(/*turbopackIgnore: true*/ tmpDir)) {
+      try { fs.mkdirSync(/*turbopackIgnore: true*/ tmpDir, { recursive: true }); } catch { /* ignore */ }
+    }
+    return tmpDir;
+  }
   return path.join(getProjectRoot(), 'data');
 }
 
@@ -49,8 +60,8 @@ function getDbPath(): string {
 
 function ensureDataDirSync(): void {
   const dataDir = getDataDir();
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(/*turbopackIgnore: true*/ dataDir)) {
+    fs.mkdirSync(/*turbopackIgnore: true*/ dataDir, { recursive: true });
   }
 }
 

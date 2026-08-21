@@ -234,7 +234,10 @@ function ShopContent() {
             </div>
           ) : (
             <>
-              <RevealGroup className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 py-8">
+              <RevealGroup
+                key={`grid-${activeCategory}-${searchQuery}-${visibleCount}`}
+                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 py-8"
+              >
                 {visibleProducts.map((p) => (
                   <RevealItem key={p.id}>
                     <ProductCard product={p} showMemberPrice />
