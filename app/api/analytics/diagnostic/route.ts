@@ -120,6 +120,8 @@ export async function GET(req: NextRequest) {
       vercel: process.env.VERCEL || false,
       turso_configured: !!(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN),
       turso_url: process.env.TURSO_DATABASE_URL ? '[SET]' : '[NOT SET]',
+      turso_url_full: tursoUrl || '[NOT SET]', // URL itself is not secret — only the auth token is
+      turso_url_length: tursoUrl.length,
       turso_url_scheme: tursoUrlScheme,
       turso_url_prefix: tursoUrl ? tursoUrl.substring(0, Math.min(20, tursoUrl.length)) + (tursoUrl.length > 20 ? '...' : '') : '[NOT SET]',
       turso_has_token: !!process.env.TURSO_AUTH_TOKEN,
