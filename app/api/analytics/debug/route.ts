@@ -146,15 +146,24 @@ export async function GET() {
     overviewDebug.visitors_table = 'error: ' + (e instanceof Error ? e.message : String(e));
   }
 
-  // Also test the sessions table directly
+  // Check actual event data to diagnose query issues
   try {
-    const allSessions = await queryDb.all<{ id: string; started_at: string }>(
-      `SELECT id, started_at FROM sessions WHERE store_id = ? LIMIT 5`,
-      ['store_darro']
+    const allEvents = await queryDb.all<{ id: string; store_id: string; created_at: string; event_name: string }>(
+      `SELECT id, store_id, created_at, event_name FROM events ORDER BY rowid DESC LIMIT 5`
     );
-    overviewDebug.sessions_table_rows = allSessions.length;
+    overviewDebug.raw_events = allEvents;
+    
+    // Check date range query
+    const rangeTest = await queryDb.all<{ id: string; created_at: string }>(
+      `SELECT id, created_at FROM events WHERE store_id = ? AND created_at BETWEEN ? AND ?`,
+      ['store_darro', range.start, range.end]
+    );
+    overviewDebug.range_query_results = rangeTest.length;
+    if (rangeTest.length > 0) {
+      overviewDebug.range_sample = rangeTest[0];
+    }
   } catch (e) {
-    overviewDebug.sessions_table = 'error: ' + (e instanceof Error ? e.message : String(e));
+    overviewDebug.raw_events_error = e instanceof Error ? e.message : String(e);
   }
 
   return NextResponse.json({
