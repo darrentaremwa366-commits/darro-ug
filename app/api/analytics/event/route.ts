@@ -312,6 +312,11 @@ export async function POST(req: NextRequest) {
     );
 
     // DB inserts for visitor and session (results captured for debugging)
+    let visitorDbResult: { changes: number; lastInsertRowid: bigint | number } = { changes: 0, lastInsertRowid: 0 };
+    let sessionDbResult: { changes: number; lastInsertRowid: bigint | number } = { changes: 0, lastInsertRowid: 0 };
+    let dbResult: { changes: number; lastInsertRowid: bigint | number } = { changes: 0, lastInsertRowid: 0 };
+    let writeVerified = false;
+
     if (!existingVisitor) {
       visitorDbResult = await queryDb.run(
         `INSERT INTO visitors (id, store_id, consent_state, first_seen_at, last_seen_at)
@@ -355,6 +360,7 @@ export async function POST(req: NextRequest) {
     }
 
     const props = body.props || {};
+    let customerId: string | null = null;
     if (eventName === 'purchase' || eventName === 'checkout_contact_submitted' || eventName === 'signup' || eventName === 'login') {
       const customerEmail = (props.customer_email as string) || (props.email as string) || null;
       const customerPhone = (props.customer_phone as string) || (props.phone as string) || null;
