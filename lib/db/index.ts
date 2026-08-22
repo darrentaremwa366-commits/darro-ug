@@ -317,9 +317,11 @@ class TursoBackend implements DbBackend {
   constructor(private client: LibsqlClient) {}
   async get<T = unknown>(sql: string, params: unknown[] = []): Promise<T | undefined> {
     try {
-      const rs = await this.client.execute({ sql, args: params as any });
-      if (rs.rows.length === 0) return undefined;
-      return rowToObject(rs.rows[0]) as T;
+      const steps = [{ sql, args: params as any }];
+      const rs = await this.client.batch(steps as any, 'write');
+      const rows = rs[0]?.rows;
+      if (!rows || rows.length === 0) return undefined;
+      return rowToObject(rows[0]) as T;
     } catch (e) {
       console.warn('[db] TursoBackend.get failed:', e instanceof Error ? e.message : String(e));
       return undefined;
@@ -327,8 +329,11 @@ class TursoBackend implements DbBackend {
   }
   async all<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
     try {
-      const rs = await this.client.execute({ sql, args: params as any });
-      return rs.rows.map((r) => rowToObject(r)) as T[];
+      const steps = [{ sql, args: params as any }];
+      const rs = await this.client.batch(steps as any, 'write');
+      const rows = rs[0]?.rows;
+      if (!rows) return [];
+      return rows.map((r) => rowToObject(r)) as T[];
     } catch (e) {
       console.warn('[db] TursoBackend.all failed:', e instanceof Error ? e.message : String(e));
       return [];
@@ -336,10 +341,12 @@ class TursoBackend implements DbBackend {
   }
   async run(sql: string, params: unknown[] = []) {
     try {
-      const rs = await this.client.execute({ sql, args: params as any });
+      const steps = [{ sql, args: params as any }];
+      const rs = await this.client.batch(steps as any, 'write');
+      const result = rs[0];
       return {
-        changes: rs.rowsAffected ?? 0,
-        lastInsertRowid: rs.lastInsertRowid != null ? BigInt(String(rs.lastInsertRowid)) : 0,
+        changes: result?.rowsAffected ?? 0,
+        lastInsertRowid: result?.lastInsertRowid != null ? BigInt(String(result.lastInsertRowid)) : 0,
       };
     } catch (e) {
       console.warn('[db] TursoBackend.run failed:', e instanceof Error ? e.message : String(e));
@@ -352,9 +359,9 @@ class TursoBackend implements DbBackend {
         .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
-      for (const stmt of stmts) {
-        await this.client.execute(stmt);
-      }
+      // Execute all statements in a single batch for consistency
+      const steps = stmts.map((s) => ({ sql: s }));
+      await this.client.batch(steps as any, 'write');
     } catch (e) {
       console.warn('[db] TursoBackend.exec failed:', e instanceof Error ? e.message : String(e));
     }
@@ -498,7 +505,7 @@ async function resolveBackend(): Promise<DbBackend> {
         // returning. The first query on a fresh connection may return stale
         // or empty results due to connection initialization lag.
         try {
-          await client.execute('SELECT 1');
+          await client.batch([{ sql: 'SELECT 1' }] as any, 'write');
           // Small delay to allow the connection to stabilize
           await new Promise(resolve => setTimeout(resolve, 100));
         } catch {
