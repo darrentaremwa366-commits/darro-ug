@@ -499,6 +499,8 @@ async function resolveBackend(): Promise<DbBackend> {
         // or empty results due to connection initialization lag.
         try {
           await client.execute('SELECT 1');
+          // Small delay to allow the connection to stabilize
+          await new Promise(resolve => setTimeout(resolve, 100));
         } catch {
           // Warmup failed but we can still try to use the backend
         }
@@ -540,7 +542,13 @@ export const queryDb = {
   async get<T = unknown>(sql: string, params?: unknown[]): Promise<T | undefined> {
     try {
       const b = await resolveBackend();
-      return await b.get<T>(sql, params ?? []);
+      const result = await b.get<T>(sql, params ?? []);
+      // Retry once on Turso if result is empty (first-query staleness)
+      if ((result === undefined || result === null) && b.type === 'turso') {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return await b.get<T>(sql, params ?? []);
+      }
+      return result;
     } catch (e) {
       console.warn('[db] queryDb.get outer failure:', e instanceof Error ? e.message : String(e));
       return undefined;
@@ -549,7 +557,13 @@ export const queryDb = {
   async all<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
     try {
       const b = await resolveBackend();
-      return await b.all<T>(sql, params ?? []);
+      const result = await b.all<T>(sql, params ?? []);
+      // Retry once on Turso if result is empty (first-query staleness)
+      if (result.length === 0 && b.type === 'turso') {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return await b.all<T>(sql, params ?? []);
+      }
+      return result;
     } catch (e) {
       console.warn('[db] queryDb.all outer failure:', e instanceof Error ? e.message : String(e));
       return [];
