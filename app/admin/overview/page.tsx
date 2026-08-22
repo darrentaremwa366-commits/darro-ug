@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getAdminUserFromRequest } from "@/lib/auth";
 import {
   getOverviewKpis,
@@ -13,6 +14,9 @@ import StatCard from "@/components/admin/StatCard";
 
 // Force server-side rendering on every request (no caching)
 export const dynamic = "force-dynamic";
+// Ensure Vercel edge does not cache admin pages
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 function formatUGX(amount: number): string {
   return `UGX ${Intl.NumberFormat("en-UG").format(amount)}`;
@@ -24,46 +28,48 @@ function compactUGX(amount: number): string {
   return String(amount);
 }
 
+const EMPTY_KPIS: Awaited<ReturnType<typeof getOverviewKpis>> = {
+  sessions: 0, visitors: 0, newVisitors: 0, returningVisitors: 0, orders: 0,
+  newCustomers: 0, returningCustomers: 0, conversionRatePct: 0,
+  pageviews: 0, grossSalesUGX: 0, netSalesUGX: 0, discountsUGX: 0, refundsUGX: 0,
+  avgOrderValueUGX: 0, unitsPerOrder: 0, cogsUGX: 0, grossProfitUGX: 0,
+  grossMarginPct: 0, marketingSpendUGX: 0, roas: 0, cacUGX: 0, addToCarts: 0,
+  checkoutStarts: 0, purchases: 0,
+};
+
+const EMPTY_FUNNEL: Awaited<ReturnType<typeof getFunnel>> = {
+  steps: [], productViews: 0, addToCarts: 0,
+  checkoutStarts: 0, contactSubmitted: 0, purchases: 0,
+};
+
+// Wrap each query independently so one failure does not zero-out the rest.
+async function safe<T,>(fn: () => Promise<T>, fallback: T, label: string): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(`[admin/overview] ${label} failed:`, err instanceof Error ? err.message : String(err));
+    return fallback;
+  }
+}
+
 export default async function AdminOverview() {
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
 
-  let kpis: Awaited<ReturnType<typeof getOverviewKpis>>;
-  let timeline: Awaited<ReturnType<typeof getSalesTimeline>>;
-  let traffic: Awaited<ReturnType<typeof getTrafficSources>>;
-  let revenueByCol: Awaited<ReturnType<typeof getRevenueByCollection>>;
-  let topPages: Awaited<ReturnType<typeof getTopPages>>;
-  let funnel: Awaited<ReturnType<typeof getFunnel>>;
+  // Set cache-control headers to prevent edge caching
+  const h = await headers();
+  h.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  h.set("Pragma", "no-cache");
 
-  try {
-    [kpis, timeline, traffic, revenueByCol, topPages, funnel] = await Promise.all([
-      getOverviewKpis(),
-      getSalesTimeline({ granularity: "day" }),
-      getTrafficSources(),
-      getRevenueByCollection(),
-      getTopPages({ limit: 10 }),
-      getFunnel(),
-    ]);
-  } catch (err) {
-    console.error('[admin/overview] query error (falling back to empty dashboard):',
-      err instanceof Error ? err.message : String(err));
-    kpis = {
-      sessions: 0, visitors: 0, newVisitors: 0, returningVisitors: 0, orders: 0,
-      newCustomers: 0, returningCustomers: 0, conversionRatePct: 0,
-      pageviews: 0, grossSalesUGX: 0, netSalesUGX: 0, discountsUGX: 0, refundsUGX: 0,
-      avgOrderValueUGX: 0, unitsPerOrder: 0, cogsUGX: 0, grossProfitUGX: 0,
-      grossMarginPct: 0, marketingSpendUGX: 0, roas: 0, cacUGX: 0, addToCarts: 0,
-      checkoutStarts: 0, purchases: 0,
-    };
-    timeline = [];
-    traffic = [];
-    revenueByCol = [];
-    topPages = [];
-    funnel = {
-      steps: [], productViews: 0, addToCarts: 0,
-      checkoutStarts: 0, contactSubmitted: 0, purchases: 0,
-    };
-  }
+  // Call each query independently so one failure does not kill all metrics
+  const [kpis, timeline, traffic, revenueByCol, topPages, funnel] = await Promise.all([
+    safe(getOverviewKpis, EMPTY_KPIS, "getOverviewKpis"),
+    safe(() => getSalesTimeline({ granularity: "day" }), [], "getSalesTimeline"),
+    safe(getTrafficSources, [], "getTrafficSources"),
+    safe(getRevenueByCollection, [], "getRevenueByCollection"),
+    safe(() => getTopPages({ limit: 10 }), [], "getTopPages"),
+    safe(getFunnel, EMPTY_FUNNEL, "getFunnel"),
+  ]);
 
   const maxRevenue = Math.max(...timeline.map((d) => d.revenue), 1);
   const maxVisits = Math.max(...timeline.map((d) => d.visits), 1);
