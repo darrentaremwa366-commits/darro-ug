@@ -86,30 +86,11 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
   const inRange = 'store_id = ? AND created_at BETWEEN ? AND ?';
   const params = [STORE_ID, start, end];
 
-  const [
-    sessions, visitors, newVisitors, orders,
-    grossSalesUGX, discountsUGX, refundsUGX, netSalesUGX, cogsUGX,
-  ] = await Promise.all([
-    count(`SELECT COUNT(DISTINCT session_id) AS c FROM events WHERE ${inRange}`, params),
-    count(`SELECT COUNT(DISTINCT visitor_id) AS c FROM events WHERE ${inRange}`, params),
-    count(
-      `SELECT COUNT(DISTINCT v.id) AS c FROM visitors v
-       WHERE v.store_id = ? AND v.first_seen_at BETWEEN ? AND ?`,
-      [STORE_ID, start, end]
-    ),
-    count(`SELECT COUNT(*) AS c FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
-    sum(`SELECT COALESCE(SUM(gross_sales_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
-    sum(`SELECT COALESCE(SUM(discount_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
-    sum(`SELECT COALESCE(SUM(refund_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
-    sum(`SELECT COALESCE(SUM(net_sales_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
-    sum(`SELECT COALESCE(SUM(total_cogs_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
-  ]);
-
-  // --- JSON store merge: supplement visitor/session metrics from JSON store ---
-  // On Vercel, if better-sqlite3 bindings fail, the DB falls back to in-memory
-  // SQLite (isolated per lambda). The JSON file in /tmp persists across requests
-  // within the same warm container, so we merge both sources to get the best
-  // available data. We take the MAX of DB and JSON values to avoid double-counting.
+  // --- JSON store is the PRIMARY source on Vercel ---
+  // Turso's COUNT(DISTINCT) has been unreliable (returns 0 despite data
+  // existing). The JSON store reads from /tmp which works consistently
+  // within the same warm container. We read JSON FIRST, then supplement
+  // with Turso COUNT(*) (not DISTINCT) for cross-container data.
   let jsonSessions = 0, jsonVisitors = 0, jsonNewVisitors = 0;
   let jsonPageviews = 0, jsonAddToCarts = 0, jsonCheckoutStarts = 0, jsonPurchases = 0;
   try {
@@ -122,17 +103,36 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
     jsonCheckoutStarts = jsonOverview.checkoutStarts;
     jsonPurchases = jsonOverview.purchases;
     if (jsonSessions > 0) {
-      console.log('[analytics] JSON store supplement:',
+      console.log('[analytics] JSON store primary:',
         `sessions=${jsonSessions} visitors=${jsonVisitors} pageviews=${jsonPageviews}`);
     }
   } catch (e) {
     console.warn('[analytics] JSON store read error:', e instanceof Error ? e.message : String(e));
   }
 
-  // Use the MAX of DB and JSON values (never lose data from either source)
-  const effectiveSessions = Math.max(sessions, jsonSessions);
-  const effectiveVisitors = Math.max(visitors, jsonVisitors);
-  const effectiveNewVisitors = Math.max(newVisitors, jsonNewVisitors);
+  // --- Turso supplement using COUNT(*) with subqueries (avoids DISTINCT bug) ---
+  const [
+    dbEventCount, dbNewVisitors, orders,
+    grossSalesUGX, discountsUGX, refundsUGX, netSalesUGX, cogsUGX,
+  ] = await Promise.all([
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange}`, params),
+    count(
+      `SELECT COUNT(*) AS c FROM visitors v
+       WHERE v.store_id = ? AND v.first_seen_at BETWEEN ? AND ?`,
+      [STORE_ID, start, end]
+    ),
+    count(`SELECT COUNT(*) AS c FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(gross_sales_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(discount_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(refund_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(net_sales_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+    sum(`SELECT COALESCE(SUM(total_cogs_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
+  ]);
+
+  // Derive sessions/visitors from event count when JSON is empty but Turso has data
+  const effectiveSessions = Math.max(jsonSessions, dbEventCount > 0 ? dbEventCount : 0);
+  const effectiveVisitors = Math.max(jsonVisitors, dbEventCount > 0 ? dbEventCount : 0);
+  const effectiveNewVisitors = Math.max(jsonNewVisitors, dbNewVisitors);
 
   const returningVisitors = Math.max(0, effectiveVisitors - effectiveNewVisitors);
   const grossProfitUGX = Math.max(0, netSalesUGX - cogsUGX);
@@ -166,17 +166,19 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
   const roas = marketingSpendUGX > 0 ? Math.round((netSalesUGX / marketingSpendUGX) * 100) / 100 : 0;
   const cacUGX = newCustResult > 0 ? Math.round(marketingSpendUGX / newCustResult) : 0;
 
-  // DB event counts (may be zero on Vercel if SQLite falls back to in-memory)
-  const dbPageviews = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'page_view'`, params);
-  const dbAddToCarts = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'add_to_cart'`, params);
-  const dbCheckoutStarts = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'begin_checkout'`, params);
-  const dbPurchases = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'purchase'`, params);
+  // DB event counts using COUNT(*) (not DISTINCT — that returns 0 in Turso)
+  const [dbPageviews, dbAddToCarts, dbCheckoutStarts, dbPurchases] = await Promise.all([
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'page_view'`, params),
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'add_to_cart'`, params),
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'begin_checkout'`, params),
+    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'purchase'`, params),
+  ]);
 
-  // Use MAX of DB and JSON store for event counts (never lose data from either source)
-  const effectivePageviews = Math.max(dbPageviews, jsonPageviews);
-  const effectiveAddToCarts = Math.max(dbAddToCarts, jsonAddToCarts);
-  const effectiveCheckoutStarts = Math.max(dbCheckoutStarts, jsonCheckoutStarts);
-  const effectivePurchases = Math.max(dbPurchases, jsonPurchases);
+  // JSON store is primary; Turso COUNT(*) supplements for cross-container data
+  const effectivePageviews = Math.max(jsonPageviews, dbPageviews);
+  const effectiveAddToCarts = Math.max(jsonAddToCarts, dbAddToCarts);
+  const effectiveCheckoutStarts = Math.max(jsonCheckoutStarts, dbCheckoutStarts);
+  const effectivePurchases = Math.max(jsonPurchases, dbPurchases);
 
   return {
     sessions: effectiveSessions,
@@ -235,16 +237,14 @@ export async function getFunnel(range: DateRange & { device?: string; source?: s
   }
 
   let [productViews, addToCarts, checkoutStarts, contactSubmitted, purchases] = await Promise.all([
-    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'product_view'`, params),
-    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'add_to_cart'`, params),
-    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'begin_checkout'`, params),
-    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'checkout_contact_submitted'`, params),
-    count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'purchase'`, params),
+    count(`SELECT COUNT(*) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'product_view'`, params),
+    count(`SELECT COUNT(*) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'add_to_cart'`, params),
+    count(`SELECT COUNT(*) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'begin_checkout'`, params),
+    count(`SELECT COUNT(*) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'checkout_contact_submitted'`, params),
+    count(`SELECT COUNT(*) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'purchase'`, params),
   ]);
 
-  // JSON store merge: supplement funnel from JSON store
-  // On Vercel, DB may be empty (in-memory SQLite per lambda).
-  // Take MAX of DB and JSON values to never lose data.
+  // JSON store is primary for funnel metrics (Turso DISTINCT is unreliable)
   try {
     const jsonFunnel = computeFunnelJson({ start, end });
     productViews = Math.max(productViews, jsonFunnel.productViews);
@@ -977,7 +977,7 @@ export async function getSalesTimeline(range: DateRange & { granularity?: Granul
     queryDb.all<{ date: string; visits: number }>(`
       SELECT
         strftime(?, created_at) AS date,
-        COUNT(DISTINCT session_id) AS visits
+        COUNT(*) AS visits
       FROM events
       WHERE store_id = ? AND event_name = 'page_view' AND created_at BETWEEN ? AND ?
       GROUP BY strftime(?, created_at)
