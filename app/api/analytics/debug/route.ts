@@ -63,6 +63,31 @@ export async function GET() {
   const visitors = getVisitors();
   const sessions = getSessions();
 
+  // Test Turso write to verify writes work
+  let writeTest = 'not_tested';
+  let writeError: string | null = null;
+  let verifyCount = 0;
+  try {
+    const testId = 'debug-test-' + Date.now();
+    const now = new Date().toISOString();
+    const writeResult = await queryDb.run(
+      `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at, page_path, referrer, consent_state, schema_version, props_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [testId, 'store_darro', 'debug-visitor', 'debug-session', null, 'page_view', now, '/debug-test', null, 'granted', 1, null]
+    );
+    writeTest = `inserted (changes=${writeResult.changes})`;
+    
+    // Verify the write by reading back
+    const verifyRow = await queryDb.get<{ c: number }>(
+      "SELECT COUNT(*) AS c FROM events WHERE visitor_id = ?",
+      ['debug-visitor']
+    );
+    verifyCount = verifyRow?.c || 0;
+  } catch (e) {
+    writeError = e instanceof Error ? e.message : String(e);
+    writeTest = 'failed';
+  }
+
   return NextResponse.json({
     status: 'ok',
     timestamp: now.toISOString(),
@@ -77,6 +102,9 @@ export async function GET() {
       visitor_count: dbVisitorCount,
       pageview_count: dbPageviewCount,
       product_view_count: productViewCount,
+      write_test: writeTest,
+      write_error: writeError,
+      write_verify_count: verifyCount,
     },
     json_store: {
       file_size_bytes: jsonStats.fileSize,
