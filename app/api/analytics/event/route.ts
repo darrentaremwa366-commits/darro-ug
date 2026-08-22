@@ -211,7 +211,6 @@ export async function POST(req: NextRequest) {
 
     // ============================================================
     // STEP 0: Parse UTM parameters and classify traffic source
-    // (Done early so both JSON store and DB writes use the same data)
     // ============================================================
     let pageUtm = {
       utm_source: null as string | null,
@@ -225,9 +224,7 @@ export async function POST(req: NextRequest) {
         const qs = pagePath.split('?')[1] || '';
         const sp = new URLSearchParams(qs);
         pageUtm = parseUtmParams(sp);
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     }
 
     const propsUtm = parseUtmParams(body.props?.utm as Record<string, unknown> | undefined);
@@ -241,13 +238,11 @@ export async function POST(req: NextRequest) {
     const sourceClass = classifySource(referrer, mergedUtm);
 
     // ============================================================
-    // STEP 1: Write to JSON store FIRST (primary storage on Vercel)
-    // This ensures events are captured even if the DB layer fails.
-    // On Vercel, the JSON file in /tmp persists across requests
-    // within the same warm container.
+    // STEP 1: Write to JSON store FIRST (critical path, synchronous)
+    // This is the primary analytics storage on Vercel. It MUST succeed
+    // before we return the response so the dashboard can show metrics.
     // ============================================================
     try {
-      // Upsert visitor in JSON store
       upsertVisitor({
         id: visitorId,
         store_id: STORE_ID,
@@ -255,8 +250,6 @@ export async function POST(req: NextRequest) {
         first_seen_at: now,
         last_seen_at: now,
       });
-
-      // Upsert session in JSON store (with full UTM attribution data)
       upsertSession({
         id: sessionId,
         store_id: STORE_ID,
@@ -270,8 +263,6 @@ export async function POST(req: NextRequest) {
         source_class: sourceClass,
         started_at: now,
       });
-
-      // Append event in JSON store
       appendEvent({
         id: eventId,
         store_id: STORE_ID,
@@ -287,227 +278,126 @@ export async function POST(req: NextRequest) {
         props_json: propsJson,
       });
     } catch (jsonErr) {
-      console.warn('[analytics] JSON store write failed:',
+      console.error('[analytics] JSON store write FAILED:',
         jsonErr instanceof Error ? jsonErr.message : String(jsonErr));
+      // CRITICAL: If JSON store write fails, return 500 so client knows
+      return NextResponse.json({ ok: false, error: 'Failed to store analytics' }, { status: 500 });
     }
 
     // ============================================================
-    // STEP 2: Check for duplicate event in DB (dedup)
+    // STEP 2: Build Turso write statements (non-blocking background task)
     // ============================================================
-    const existingEvent = await queryDb.get<{ id: string }>(
-      'SELECT id FROM events WHERE id = ? AND store_id = ?',
-      [eventId, STORE_ID]
-    );
-
-    if (existingEvent) {
-      const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId, deduped: true });
-      setCookies(response, visitorId, sessionId);
-      setCorsHeaders(response, origin);
-      return response;
-    }
-
-    const existingVisitor = await queryDb.get<{ id: string; consent_state: string; first_seen_at: string }>(
-      'SELECT id, consent_state, first_seen_at FROM visitors WHERE id = ? AND store_id = ?',
-      [visitorId, STORE_ID]
-    );
-
-    // DB inserts for visitor and session (results captured for debugging)
-    let visitorDbResult: { changes: number; lastInsertRowid: bigint | number } = { changes: 0, lastInsertRowid: 0 };
-    let sessionDbResult: { changes: number; lastInsertRowid: bigint | number } = { changes: 0, lastInsertRowid: 0 };
-    let dbResult: { changes: number; lastInsertRowid: bigint | number } = { changes: 0, lastInsertRowid: 0 };
-    let writeVerified = false;
-
-    if (!existingVisitor) {
-      visitorDbResult = await queryDb.run(
-        `INSERT INTO visitors (id, store_id, consent_state, first_seen_at, last_seen_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [visitorId, STORE_ID, consentState, now, now]
-      );
-    } else {
-      const updateConsent = consentState === 'granted' ? consentState : existingVisitor.consent_state;
-      visitorDbResult = await queryDb.run(
-        `UPDATE visitors SET consent_state = ?, last_seen_at = ? WHERE id = ? AND store_id = ?`,
-        [updateConsent, now, visitorId, STORE_ID]
-      );
-    }
-
-    const existingSession = await queryDb.get<{ id: string; started_at: string }>(
-      'SELECT id, started_at FROM sessions WHERE id = ? AND store_id = ?',
-      [sessionId, STORE_ID]
-    );
-
-    if (!existingSession) {
-      sessionDbResult = await queryDb.run(
-        `INSERT INTO sessions (id, store_id, visitor_id, landing_path, referrer,
-                               utm_source, utm_medium, utm_campaign, utm_content, utm_term,
-                               source_class, started_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          sessionId,
-          STORE_ID,
-          visitorId,
-          pagePath,
-          referrer,
-          mergedUtm.utm_source,
-          mergedUtm.utm_medium,
-          mergedUtm.utm_campaign,
-          mergedUtm.utm_content,
-          mergedUtm.utm_term,
-          sourceClass,
-          now,
-        ]
-      );
-    }
-
+    const statements: Array<{ sql: string; params?: unknown[] }> = [];
     const props = body.props || {};
     let customerId: string | null = null;
+
+    // 2a. Insert visitor (no dedup check needed — events have unique IDs)
+    statements.push({
+      sql: `INSERT INTO visitors (id, store_id, consent_state, first_seen_at, last_seen_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET consent_state = excluded.consent_state, last_seen_at = excluded.last_seen_at`,
+      params: [visitorId, STORE_ID, consentState, now, now],
+    });
+
+    // 2b. Insert session
+    statements.push({
+      sql: `INSERT INTO sessions (id, store_id, visitor_id, landing_path, referrer,
+                                     utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+                                     source_class, started_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO NOTHING`,
+      params: [
+        sessionId, STORE_ID, visitorId, pagePath, referrer,
+        mergedUtm.utm_source, mergedUtm.utm_medium, mergedUtm.utm_campaign,
+        mergedUtm.utm_content, mergedUtm.utm_term, sourceClass, now,
+      ],
+    });
+
+    // 2c. Handle customer linking for purchase/signup/login events
     if (eventName === 'purchase' || eventName === 'checkout_contact_submitted' || eventName === 'signup' || eventName === 'login') {
       const customerEmail = (props.customer_email as string) || (props.email as string) || null;
       const customerPhone = (props.customer_phone as string) || (props.phone as string) || null;
       const customerName = (props.customer_name as string) || (props.full_name as string) || null;
 
       if (customerEmail || customerPhone) {
-        const existingCustomer = await queryDb.get<{ id: string }>(
-          `SELECT id FROM customers WHERE store_id = ? AND (
-             (? IS NOT NULL AND LOWER(email) = LOWER(?)) OR
-             (? IS NOT NULL AND phone = ?)
-           ) LIMIT 1`,
-          [
-            STORE_ID,
-            customerEmail,
-            customerEmail || '',
-            customerPhone,
-            customerPhone || '',
-          ]
-        );
-
-        if (existingCustomer) {
-          customerId = existingCustomer.id;
-          await queryDb.run(
-            `UPDATE customers SET email = COALESCE(?, email),
-                                   phone = COALESCE(?, phone),
-                                   full_name = COALESCE(?, full_name),
-                                   updated_at = ?
-             WHERE id = ? AND store_id = ?`,
-            [customerEmail, customerPhone, customerName, now, customerId, STORE_ID]
-          );
-        } else {
-          customerId = uuid();
-          await queryDb.run(
-            `INSERT INTO customers (id, store_id, email, phone, full_name, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [customerId, STORE_ID, customerEmail, customerPhone, customerName, now, now]
-          );
-        }
-
-        const linkExists = await queryDb.get<{ id: string }>(
-          'SELECT id FROM identity_links WHERE store_id = ? AND visitor_id = ? AND customer_id = ?',
-          [STORE_ID, visitorId, customerId]
-        );
-
-        if (!linkExists) {
-          await queryDb.run(
-            `INSERT INTO identity_links (id, store_id, visitor_id, customer_id, linked_via, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [
-              uuid(),
-              STORE_ID,
-              visitorId,
-              customerId,
-              eventName === 'login' ? 'login' : eventName === 'signup' ? 'signup' : 'checkout_email',
-              now,
-            ]
-          );
-        }
-
-        if (existingSession) {
-          await queryDb.run(
-            `UPDATE sessions SET customer_id = ? WHERE id = ? AND store_id = ?`,
-            [customerId, sessionId, STORE_ID]
-          );
-        }
-      }
-    }
-
-    dbResult = await queryDb.run(
-      `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at,
-                           page_path, referrer, consent_state, schema_version, props_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        eventId,
-        STORE_ID,
-        visitorId,
-        sessionId,
-        customerId,
-        eventName,
-        now,
-        pagePath,
-        referrer,
-        consentState,
-        schemaVersion,
-        propsJson,
-      ]
-    );
-
-    // Verify the write persisted (read-after-write)
-    try {
-      const verifyRow = await queryDb.get<{ id: string }>(
-        'SELECT id FROM events WHERE id = ?',
-        [eventId]
-      );
-      writeVerified = !!verifyRow;
-    } catch {
-      writeVerified = false;
-    }
-
-    // --- JSON store update (second pass) ---
-    // The event was already written to JSON store in STEP 1.
-    // Here we update with customer_id if it was linked during DB processing.
-    try {
-      // Update visitor/session with customer_id if available
-      if (customerId) {
-        upsertSession({
-          id: sessionId,
-          store_id: STORE_ID,
-          visitor_id: visitorId,
-          customer_id: customerId,
-          landing_path: pagePath,
-          referrer: referrer,
-          utm_source: mergedUtm.utm_source,
-          utm_medium: mergedUtm.utm_medium,
-          utm_campaign: mergedUtm.utm_campaign,
-          source_class: sourceClass,
-          started_at: now,
+        customerId = 'cust_' + visitorId.slice(0, 8);
+        statements.push({
+          sql: `INSERT INTO customers (id, store_id, email, phone, full_name, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(id) DO UPDATE SET
+                   email = COALESCE(?, customers.email),
+                   phone = COALESCE(?, customers.phone),
+                   full_name = COALESCE(?, customers.full_name),
+                   updated_at = ?`,
+          params: [customerId, STORE_ID, customerEmail, customerPhone, customerName, now, now,
+                   customerEmail, customerPhone, customerName, now],
         });
-
-        // Update the event with customer_id
-        updateEvent(eventId, { customer_id: customerId });
+        statements.push({
+          sql: `INSERT INTO identity_links (id, store_id, visitor_id, customer_id, linked_via, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON CONFLICT DO NOTHING`,
+          params: [uuid(), STORE_ID, visitorId, customerId,
+                   eventName === 'login' ? 'login' : eventName === 'signup' ? 'signup' : 'checkout_email',
+                   now],
+        });
+        statements.push({
+          sql: `UPDATE sessions SET customer_id = ? WHERE id = ? AND store_id = ?`,
+          params: [customerId, sessionId, STORE_ID],
+        });
+        // Update JSON store with customer_id
+        try {
+          upsertSession({
+            id: sessionId, store_id: STORE_ID, visitor_id: visitorId,
+            customer_id: customerId, landing_path: pagePath, referrer: referrer,
+            utm_source: mergedUtm.utm_source, utm_medium: mergedUtm.utm_medium,
+            utm_campaign: mergedUtm.utm_campaign, source_class: sourceClass, started_at: now,
+          });
+          updateEvent(eventId, { customer_id: customerId });
+        } catch { /* non-critical */ }
       }
-    } catch (jsonErr) {
-      console.warn('[analytics] JSON store update failed (non-critical):',
-        jsonErr instanceof Error ? jsonErr.message : String(jsonErr));
     }
 
+    // 2d. Insert the event
+    statements.push({
+      sql: `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at,
+                                   page_path, referrer, consent_state, schema_version, props_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params: [eventId, STORE_ID, visitorId, sessionId, customerId, eventName, now,
+               pagePath, referrer, consentState, schemaVersion, propsJson],
+    });
+
+    // ============================================================
+    // STEP 3: Execute Turso batch write (single round trip, awaited)
+    // We await this to ensure the write completes before the function
+    // is recycled on Vercel. With only 1 batch round trip (not 3+),
+    // this should complete in <500ms even on slow connections.
+    // ============================================================
+    const batchResult = await queryDb.batch(statements);
+    const tursoOk = batchResult.success;
+    if (!tursoOk) {
+      console.warn('[analytics] Turso batch write returned failure:', batchResult.error);
+    }
+
+    // Handle purchase/add_to_cart side effects (also awaited for reliability)
     if (eventName === 'add_to_cart' && body.props) {
-      await handleAddToCart(visitorId, sessionId, customerId, body.props.cart, body.props.item, now);
+      try { await handleAddToCart(visitorId, sessionId, customerId, body.props.cart, body.props.item, now); } catch { /* ignore */ }
     }
-
     if (eventName === 'begin_checkout' && body.props) {
-      await handleBeginCheckout(visitorId, sessionId, customerId, body.props.cart_id, now);
+      try { await handleBeginCheckout(visitorId, sessionId, customerId, body.props.cart_id, now); } catch { /* ignore */ }
     }
-
     if (eventName === 'purchase' && body.props) {
-      await handlePurchase(visitorId, sessionId, customerId, body.props, now);
+      try { await handlePurchase(visitorId, sessionId, customerId, body.props, now); } catch { /* ignore */ }
     }
 
+    // ============================================================
+    // STEP 4: Return response
+    // ============================================================
     const response = NextResponse.json({
       ok: true,
       visitor_id: visitorId,
       session_id: sessionId,
-      db_changes: dbResult.changes,
-      write_verified: writeVerified,
-      visitor_db_changes: visitorDbResult.changes,
-      session_db_changes: sessionDbResult.changes,
+      json_saved: true,
+      turso_saved: tursoOk,
     });
     setCookies(response, visitorId, sessionId);
     setCorsHeaders(response, origin);

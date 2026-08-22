@@ -299,16 +299,12 @@ class SqliteBackend implements DbBackend {
     }
   }
   async batch(statements: Array<{ sql: string; params?: unknown[] }>) {
-    try {
-      const tx = this.sqlite.transaction((stmts: typeof statements) => {
-        for (const s of stmts) {
-          this.sqlite.prepare(s.sql).run(...(s.params || []));
-        }
-      });
-      tx(statements);
-    } catch (e) {
-      console.warn('[db] SqliteBackend.batch failed:', e instanceof Error ? e.message : String(e));
-    }
+    const tx = this.sqlite.transaction((stmts: typeof statements) => {
+      for (const s of stmts) {
+        this.sqlite.prepare(s.sql).run(...(s.params || []));
+      }
+    });
+    tx(statements);
   }
 }
 
@@ -368,12 +364,8 @@ class TursoBackend implements DbBackend {
     }
   }
   async batch(statements: Array<{ sql: string; params?: unknown[] }>) {
-    try {
-      const steps = statements.map((s) => ({ sql: s.sql, args: (s.params || []) as any }));
-      await this.client.batch(steps as any, 'write');
-    } catch (e) {
-      console.warn('[db] TursoBackend.batch failed:', e instanceof Error ? e.message : String(e));
-    }
+    const steps = statements.map((s) => ({ sql: s.sql, args: (s.params || []) as any }));
+    await this.client.batch(steps as any, 'write');
   }
 }
 
@@ -557,12 +549,11 @@ export const queryDb = {
     try {
       const b = await resolveBackend();
       const result = await b.get<T>(sql, params ?? []);
-      // Up to 2 retries on Turso if result is empty (replication lag)
+      // Single fast retry on Turso if result is empty (replication lag)
+      // Using 'write' consistency should make this unnecessary, but we keep
+      // one retry just in case.
       if ((result === undefined || result === null) && b.type === 'turso') {
-        await new Promise(resolve => setTimeout(resolve, 400));
-        const retry1 = await b.get<T>(sql, params ?? []);
-        if (retry1 !== undefined && retry1 !== null) return retry1;
-        await new Promise(resolve => setTimeout(resolve, 600));
+        await new Promise(resolve => setTimeout(resolve, 100));
         return await b.get<T>(sql, params ?? []);
       }
       return result;
@@ -575,12 +566,9 @@ export const queryDb = {
     try {
       const b = await resolveBackend();
       const result = await b.all<T>(sql, params ?? []);
-      // Up to 2 retries on Turso if result is empty (replication lag)
+      // Single fast retry on Turso if result is empty
       if (result.length === 0 && b.type === 'turso') {
-        await new Promise(resolve => setTimeout(resolve, 400));
-        const retry1 = await b.all<T>(sql, params ?? []);
-        if (retry1.length > 0) return retry1;
-        await new Promise(resolve => setTimeout(resolve, 600));
+        await new Promise(resolve => setTimeout(resolve, 100));
         return await b.all<T>(sql, params ?? []);
       }
       return result;
@@ -606,12 +594,15 @@ export const queryDb = {
       console.warn('[db] queryDb.exec outer failure:', e instanceof Error ? e.message : String(e));
     }
   },
-  async batch(statements: Array<{ sql: string; params?: unknown[] }>): Promise<void> {
+  async batch(statements: Array<{ sql: string; params?: unknown[] }>): Promise<{ success: boolean; error?: string }> {
     try {
       const b = await resolveBackend();
       await b.batch(statements);
+      return { success: true };
     } catch (e) {
-      console.warn('[db] queryDb.batch outer failure:', e instanceof Error ? e.message : String(e));
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      console.warn('[db] queryDb.batch outer failure:', errorMsg);
+      return { success: false, error: errorMsg };
     }
   },
 };
