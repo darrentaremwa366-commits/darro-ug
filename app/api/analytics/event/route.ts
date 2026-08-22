@@ -423,7 +423,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await queryDb.run(
+    const dbResult = await queryDb.run(
       `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at,
                            page_path, referrer, consent_state, schema_version, props_json)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -483,7 +483,7 @@ export async function POST(req: NextRequest) {
       await handlePurchase(visitorId, sessionId, customerId, body.props, now);
     }
 
-    const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId });
+    const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId, db_changes: dbResult.changes });
     setCookies(response, visitorId, sessionId);
     setCorsHeaders(response, origin);
     return response;
