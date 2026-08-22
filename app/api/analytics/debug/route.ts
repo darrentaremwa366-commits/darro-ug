@@ -148,20 +148,32 @@ export async function GET() {
 
   // Check actual event data to diagnose query issues
   try {
-    const allEvents = await queryDb.all<{ id: string; store_id: string; created_at: string; event_name: string }>(
-      `SELECT id, store_id, created_at, event_name FROM events ORDER BY rowid DESC LIMIT 5`
+    const allEvents = await queryDb.all<{ id: string; store_id: string; created_at: string; event_name: string; session_id: string | null; visitor_id: string | null }>(
+      `SELECT id, store_id, created_at, event_name, session_id, visitor_id FROM events ORDER BY rowid DESC LIMIT 5`
     );
     overviewDebug.raw_events = allEvents;
     
-    // Check date range query
-    const rangeTest = await queryDb.all<{ id: string; created_at: string }>(
-      `SELECT id, created_at FROM events WHERE store_id = ? AND created_at BETWEEN ? AND ?`,
+    // Check date range query with COUNT(DISTINCT)
+    const countQuery = await queryDb.get<{ c: number }>(
+      `SELECT COUNT(DISTINCT session_id) AS c FROM events WHERE store_id = ? AND created_at BETWEEN ? AND ?`,
       ['store_darro', range.start, range.end]
     );
-    overviewDebug.range_query_results = rangeTest.length;
-    if (rangeTest.length > 0) {
-      overviewDebug.range_sample = rangeTest[0];
-    }
+    overviewDebug.count_distinct_result = countQuery?.c || 0;
+    
+    // Check if session_id is null
+    const nullCheck = await queryDb.get<{ c: number }>(
+      `SELECT COUNT(*) AS c FROM events WHERE store_id = ? AND created_at BETWEEN ? AND ? AND session_id IS NULL`,
+      ['store_darro', range.start, range.end]
+    );
+    overviewDebug.null_session_count = nullCheck?.c || 0;
+    
+    // Check simple count
+    const simpleCount = await queryDb.get<{ c: number }>(
+      `SELECT COUNT(*) AS c FROM events WHERE store_id = ? AND created_at BETWEEN ? AND ?`,
+      ['store_darro', range.start, range.end]
+    );
+    overviewDebug.simple_count = simpleCount?.c || 0;
+    
   } catch (e) {
     overviewDebug.raw_events_error = e instanceof Error ? e.message : String(e);
   }
