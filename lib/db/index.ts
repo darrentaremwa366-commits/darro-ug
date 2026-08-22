@@ -493,6 +493,16 @@ async function resolveBackend(): Promise<DbBackend> {
           });
         }
         await globalForBackend.seedPromise;
+        
+        // Warmup query: ensure the Turso connection is fully ready before
+        // returning. The first query on a fresh connection may return stale
+        // or empty results due to connection initialization lag.
+        try {
+          await client.execute('SELECT 1');
+        } catch {
+          // Warmup failed but we can still try to use the backend
+        }
+        
         return backend;
       } catch (tursoErr) {
         console.warn('[db] Turso init failed, falling back to SQLite.',
