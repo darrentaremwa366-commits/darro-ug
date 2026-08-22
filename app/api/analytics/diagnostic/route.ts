@@ -102,11 +102,17 @@ export async function GET(req: NextRequest) {
     }
 
     const tursoUrl = process.env.TURSO_DATABASE_URL || '';
-    const tursoUrlScheme = tursoUrl.startsWith('libsql:') || tursoUrl.startsWith('wss:') || tursoUrl.startsWith('https:')
-      ? 'remote'
-      : tursoUrl.startsWith('file:')
-        ? 'local-file (DATA LOST ON REDEPLOY)'
-        : 'unknown';
+    // IMPORTANT: check libsql:file: and :memory: BEFORE libsql://
+    // because libsql:file:/path starts with "libsql:" too.
+    const tursoUrlScheme = tursoUrl.startsWith('libsql:file:') || tursoUrl.startsWith('file:')
+      ? 'local-file (DATA LOST ON REDEPLOY)'
+      : tursoUrl.startsWith('libsql::memory:') || tursoUrl.startsWith(':memory:')
+        ? 'in-memory (DATA LOST ON REDEPLOY)'
+        : tursoUrl.startsWith('libsql://') || tursoUrl.startsWith('wss://') || tursoUrl.startsWith('https://')
+          ? 'remote'
+          : tursoUrl.startsWith('libsql:')
+            ? 'unknown-libsql-variant (possibly local)'
+            : 'unknown';
 
     // 3. Environment info
     const envInfo = {
@@ -114,6 +120,8 @@ export async function GET(req: NextRequest) {
       turso_configured: !!(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN),
       turso_url: process.env.TURSO_DATABASE_URL ? '[SET]' : '[NOT SET]',
       turso_url_scheme: tursoUrlScheme,
+      turso_url_prefix: tursoUrl ? tursoUrl.substring(0, Math.min(20, tursoUrl.length)) + (tursoUrl.length > 20 ? '...' : '') : '[NOT SET]',
+      turso_has_token: !!process.env.TURSO_AUTH_TOKEN,
       node_env: process.env.NODE_ENV || 'unknown',
     };
 
