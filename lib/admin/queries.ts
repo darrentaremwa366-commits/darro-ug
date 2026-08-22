@@ -89,29 +89,34 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
     sum(`SELECT COALESCE(SUM(total_cogs_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
   ]);
 
-  // --- JSON store fallback: supplement visitor/session metrics when DB is empty ---
+  // --- JSON store merge: supplement visitor/session metrics from JSON store ---
   // On Vercel, if better-sqlite3 bindings fail, the DB falls back to in-memory
   // SQLite (isolated per lambda). The JSON file in /tmp persists across requests
-  // within the same warm container, so we use it to recover key metrics.
+  // within the same warm container, so we merge both sources to get the best
+  // available data. We take the MAX of DB and JSON values to avoid double-counting.
   let jsonSessions = 0, jsonVisitors = 0, jsonNewVisitors = 0;
   let jsonPageviews = 0, jsonAddToCarts = 0, jsonCheckoutStarts = 0, jsonPurchases = 0;
-  if (sessions === 0 && visitors === 0) {
-    try {
-      const jsonOverview = computeOverviewFromJson({ start, end });
-      jsonSessions = jsonOverview.sessions;
-      jsonVisitors = jsonOverview.visitors;
-      jsonNewVisitors = jsonOverview.newVisitors;
-      jsonPageviews = jsonOverview.pageviews;
-      jsonAddToCarts = jsonOverview.addToCarts;
-      jsonCheckoutStarts = jsonOverview.checkoutStarts;
-      jsonPurchases = jsonOverview.purchases;
-    } catch { /* JSON store empty or unavailable */ }
+  try {
+    const jsonOverview = computeOverviewFromJson({ start, end });
+    jsonSessions = jsonOverview.sessions;
+    jsonVisitors = jsonOverview.visitors;
+    jsonNewVisitors = jsonOverview.newVisitors;
+    jsonPageviews = jsonOverview.pageviews;
+    jsonAddToCarts = jsonOverview.addToCarts;
+    jsonCheckoutStarts = jsonOverview.checkoutStarts;
+    jsonPurchases = jsonOverview.purchases;
+    if (jsonSessions > 0) {
+      console.log('[analytics] JSON store supplement:',
+        `sessions=${jsonSessions} visitors=${jsonVisitors} pageviews=${jsonPageviews}`);
+    }
+  } catch (e) {
+    console.warn('[analytics] JSON store read error:', e instanceof Error ? e.message : String(e));
   }
 
-  // Use DB values if available, otherwise fall back to JSON store
-  const effectiveSessions = sessions > 0 ? sessions : jsonSessions;
-  const effectiveVisitors = visitors > 0 ? visitors : jsonVisitors;
-  const effectiveNewVisitors = newVisitors > 0 ? newVisitors : jsonNewVisitors;
+  // Use the MAX of DB and JSON values (never lose data from either source)
+  const effectiveSessions = Math.max(sessions, jsonSessions);
+  const effectiveVisitors = Math.max(visitors, jsonVisitors);
+  const effectiveNewVisitors = Math.max(newVisitors, jsonNewVisitors);
 
   const returningVisitors = Math.max(0, effectiveVisitors - effectiveNewVisitors);
   const grossProfitUGX = Math.max(0, netSalesUGX - cogsUGX);
@@ -145,16 +150,17 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
   const roas = marketingSpendUGX > 0 ? Math.round((netSalesUGX / marketingSpendUGX) * 100) / 100 : 0;
   const cacUGX = newCustResult > 0 ? Math.round(marketingSpendUGX / newCustResult) : 0;
 
-  // Use JSON store event counts as fallback when DB is empty
+  // DB event counts (may be zero on Vercel if SQLite falls back to in-memory)
   const dbPageviews = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'page_view'`, params);
   const dbAddToCarts = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'add_to_cart'`, params);
   const dbCheckoutStarts = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'begin_checkout'`, params);
   const dbPurchases = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'purchase'`, params);
 
-  const effectivePageviews = dbPageviews > 0 ? dbPageviews : jsonPageviews;
-  const effectiveAddToCarts = dbAddToCarts > 0 ? dbAddToCarts : jsonAddToCarts;
-  const effectiveCheckoutStarts = dbCheckoutStarts > 0 ? dbCheckoutStarts : jsonCheckoutStarts;
-  const effectivePurchases = dbPurchases > 0 ? dbPurchases : jsonPurchases;
+  // Use MAX of DB and JSON store for event counts (never lose data from either source)
+  const effectivePageviews = Math.max(dbPageviews, jsonPageviews);
+  const effectiveAddToCarts = Math.max(dbAddToCarts, jsonAddToCarts);
+  const effectiveCheckoutStarts = Math.max(dbCheckoutStarts, jsonCheckoutStarts);
+  const effectivePurchases = Math.max(dbPurchases, jsonPurchases);
 
   return {
     sessions: effectiveSessions,
