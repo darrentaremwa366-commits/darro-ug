@@ -88,6 +88,52 @@ export async function GET() {
     writeTest = 'failed';
   }
 
+  // Test the exact same queries as getOverviewKpis()
+  let overviewDebug: Record<string, number | string> = {};
+  try {
+    const STORE_ID = 'store_darro';
+    const [newVisitorsRow, ordersRow] = await Promise.all([
+      queryDb.get<{ c: number }>(
+        `SELECT COUNT(DISTINCT v.id) AS c FROM visitors v WHERE v.store_id = ? AND v.first_seen_at BETWEEN ? AND ?`,
+        [STORE_ID, range.start, range.end]
+      ),
+      queryDb.get<{ c: number }>(
+        `SELECT COUNT(*) AS c FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`,
+        [STORE_ID, range.start, range.end]
+      ),
+    ]);
+    overviewDebug.new_visitors_from_table = newVisitorsRow?.c || 0;
+    overviewDebug.orders_count = ordersRow?.c || 0;
+    overviewDebug.orders_query = 'ok';
+  } catch (e) {
+    overviewDebug.orders_query = 'error: ' + (e instanceof Error ? e.message : String(e));
+  }
+
+  // Also test the visitors table directly
+  try {
+    const allVisitors = await queryDb.all<{ id: string; first_seen_at: string }>(
+      `SELECT id, first_seen_at FROM visitors WHERE store_id = ?`,
+      ['store_darro']
+    );
+    overviewDebug.visitors_table_rows = allVisitors.length;
+    if (allVisitors.length > 0) {
+      overviewDebug.visitors_sample = JSON.stringify(allVisitors[0]);
+    }
+  } catch (e) {
+    overviewDebug.visitors_table = 'error: ' + (e instanceof Error ? e.message : String(e));
+  }
+
+  // Also test the sessions table directly
+  try {
+    const allSessions = await queryDb.all<{ id: string; started_at: string }>(
+      `SELECT id, started_at FROM sessions WHERE store_id = ? LIMIT 5`,
+      ['store_darro']
+    );
+    overviewDebug.sessions_table_rows = allSessions.length;
+  } catch (e) {
+    overviewDebug.sessions_table = 'error: ' + (e instanceof Error ? e.message : String(e));
+  }
+
   return NextResponse.json({
     status: 'ok',
     timestamp: now.toISOString(),
@@ -116,5 +162,6 @@ export async function GET() {
     recent_events: recentEvents,
     visitors_count: visitors.length,
     sessions_count: sessions.length,
+    overview_debug: overviewDebug,
   });
 }
