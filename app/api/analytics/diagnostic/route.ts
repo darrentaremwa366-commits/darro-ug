@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryDb, STORE_ID } from '@/lib/db';
+import { createClient } from '@libsql/client';
+import { queryDb, STORE_ID, useTurso } from '@/lib/db';
 import {
   debugSize,
   getEvents,
@@ -125,6 +126,48 @@ export async function GET(req: NextRequest) {
       node_env: process.env.NODE_ENV || 'unknown',
     };
 
+    // 4. DIRECT Turso test — bypasses queryDb entirely to prove whether the
+    // remote Turso DB actually has events. If this returns 0 but queryDb
+    // returned >0, then queryDb was silently falling back to local SQLite
+    // (which gets wiped on every redeploy).
+    let directTurso: {
+      status: string;
+      event_count: number;
+      visitor_count: number;
+      session_count: number;
+      error: string | null;
+    } = { status: 'not_tested', event_count: -1, visitor_count: -1, session_count: -1, error: null };
+
+    if (useTurso()) {
+      try {
+        // Fresh client — no shared state with queryDb
+        const direct = createClient({
+          url: process.env.TURSO_DATABASE_URL!,
+          authToken: process.env.TURSO_AUTH_TOKEN!,
+        });
+        const [dEvt, dVis, dSess] = await Promise.all([
+          direct.execute('SELECT COUNT(*) AS c FROM events WHERE store_id = ?', [STORE_ID]),
+          direct.execute('SELECT COUNT(*) AS c FROM visitors WHERE store_id = ?', [STORE_ID]),
+          direct.execute('SELECT COUNT(*) AS c FROM sessions WHERE store_id = ?', [STORE_ID]),
+        ]);
+        directTurso = {
+          status: 'connected',
+          event_count: Number(dEvt.rows[0]?.c ?? 0),
+          visitor_count: Number(dVis.rows[0]?.c ?? 0),
+          session_count: Number(dSess.rows[0]?.c ?? 0),
+          error: null,
+        };
+      } catch (e) {
+        directTurso = {
+          status: 'error',
+          event_count: -1,
+          visitor_count: -1,
+          session_count: -1,
+          error: e instanceof Error ? e.message : String(e),
+        };
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       timestamp: now.toISOString(),
@@ -144,10 +187,17 @@ export async function GET(req: NextRequest) {
         visitor_count: tursoVisitorCount,
         session_count: tursoSessionCount,
       },
+      direct_turso: directTurso,
+      diagnosis: directTurso.event_count > 0 && tursoEventCount === 0
+        ? 'queryDb IS FALLING BACK to local SQLite (not Turso)! Events written to local SQLite get wiped on redeploy.'
+        : directTurso.event_count === 0 && directTurso.status === 'connected'
+          ? 'Turso remote DB genuinely has 0 events — event API is NOT writing to Turso (likely writing to local SQLite fallback).'
+          : 'OK',
       summary: {
         json_has_data: jsonSize.events > 0,
         turso_has_data: tursoEventCount > 0,
-        recommended_source: jsonSize.events > 0 ? 'json' : (tursoEventCount > 0 ? 'turso' : 'none'),
+        direct_turso_has_data: directTurso.event_count > 0,
+        recommended_source: jsonSize.events > 0 ? 'json' : (directTurso.event_count > 0 ? 'direct_turso' : 'none'),
       },
     });
   } catch (err) {
