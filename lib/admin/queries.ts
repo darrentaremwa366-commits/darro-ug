@@ -38,12 +38,20 @@ function resolveRange(range: DateRange): { start: string; end: string; days: num
 
 async function count(sql: string, params: unknown[] = []): Promise<number> {
   const row = await queryDb.get<{ c: number }>(sql, params);
-  return row?.c || 0;
+  if (row?.c) return row.c;
+  // Retry once after 200ms to handle Turso replication lag
+  await new Promise(resolve => setTimeout(resolve, 200));
+  const row2 = await queryDb.get<{ c: number }>(sql, params);
+  return row2?.c || 0;
 }
 
 async function sum(sql: string, params: unknown[] = []): Promise<number> {
   const row = await queryDb.get<{ s: number }>(sql, params);
-  return row?.s || 0;
+  if (row?.s) return row.s;
+  // Retry once after 200ms to handle Turso replication lag
+  await new Promise(resolve => setTimeout(resolve, 200));
+  const row2 = await queryDb.get<{ s: number }>(sql, params);
+  return row2?.s || 0;
 }
 
 export interface OverviewKpis {

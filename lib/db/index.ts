@@ -577,9 +577,12 @@ export const queryDb = {
     try {
       const b = await resolveBackend();
       const result = await b.get<T>(sql, params ?? []);
-      // Retry once on Turso if result is empty (first-query staleness)
+      // Retry twice on Turso if result is empty (first-query staleness / replication lag)
       if ((result === undefined || result === null) && b.type === 'turso') {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 200));
+        const result2 = await b.get<T>(sql, params ?? []);
+        if (result2 !== undefined && result2 !== null) return result2;
+        await new Promise(resolve => setTimeout(resolve, 300));
         return await b.get<T>(sql, params ?? []);
       }
       return result;
@@ -592,9 +595,12 @@ export const queryDb = {
     try {
       const b = await resolveBackend();
       const result = await b.all<T>(sql, params ?? []);
-      // Retry once on Turso if result is empty (first-query staleness)
+      // Retry twice on Turso if result is empty (first-query staleness / replication lag)
       if (result.length === 0 && b.type === 'turso') {
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 200));
+        const result2 = await b.all<T>(sql, params ?? []);
+        if (result2.length > 0) return result2;
+        await new Promise(resolve => setTimeout(resolve, 300));
         return await b.all<T>(sql, params ?? []);
       }
       return result;
