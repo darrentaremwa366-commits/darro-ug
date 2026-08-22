@@ -490,7 +490,15 @@ function noopBackend(): DbBackend {
 }
 
 async function resolveBackend(): Promise<DbBackend> {
-  if (globalForBackend.backend) return globalForBackend.backend;
+  // Only return cached backend if it's Turso (the persistent remote DB).
+  // If it's SQLite or Noop (fallbacks from a failed cold-start Turso init),
+  // we retry Turso on every request — the first failure was likely a
+  // transient network/timeout issue, not a permanent condition.
+  // Without this, a single cold-start Turso timeout permanently dooms the
+  // entire container to returning 0 for all queries, even after Turso recovers.
+  if (globalForBackend.backend && globalForBackend.backend.type === 'turso') {
+    return globalForBackend.backend;
+  }
 
   try {
     if (useTurso()) {
@@ -501,7 +509,6 @@ async function resolveBackend(): Promise<DbBackend> {
           readYourWrites: true,
         });
         const backend = new TursoBackend(client);
-        globalForBackend.backend = backend;
         // Seed lazily; avoid double-seeding
         if (!globalForBackend.seedPromise) {
           globalForBackend.seedPromise = ensureTursoSeeded(client).catch((err) => {
@@ -509,41 +516,36 @@ async function resolveBackend(): Promise<DbBackend> {
           });
         }
         await globalForBackend.seedPromise;
-        
+
         // Warmup: force a real write to establish primary connection.
-        // Without this, the first read on a fresh Vercel container may hit a
-        // replica that hasn't received recent writes from other containers.
-        // A no-op UPDATE forces the client to connect to the primary, after
-        // which readYourWrites ensures all subsequent reads see the latest data.
         try {
           await client.execute(
             'UPDATE stores SET updated_at = updated_at WHERE id = ?',
             [STORE_ID]
           );
-          // Small delay to allow the connection to stabilize
           await new Promise(resolve => setTimeout(resolve, 200));
         } catch {
           // Warmup failed but we can still try to use the backend
         }
-        
+
+        // Only cache the Turso backend — it's the one we want to keep.
+        globalForBackend.backend = backend;
         return backend;
       } catch (tursoErr) {
         console.warn('[db] Turso init failed, falling back to SQLite.',
           tursoErr instanceof Error ? tursoErr.message : String(tursoErr));
-        // fall through to SQLite attempt below
+        // fall through to SQLite attempt below — do NOT cache this fallback
       }
     }
 
-    // Fall back to local sync SQLite wrapped in async interface
+    // Fall back to local sync SQLite — do NOT cache (retry Turso next request)
     const backend = new SqliteBackend(getSyncDb());
-    globalForBackend.backend = backend;
     return backend;
   } catch (outerErr) {
     const msg = outerErr instanceof Error ? outerErr.message : String(outerErr);
     console.error('[db] ALL backends failed. Using NoopBackend (queries return empty):', msg);
-    const stub = noopBackend();
-    globalForBackend.backend = stub;
-    return stub;
+    // Do NOT cache NoopBackend — retry Turso on every request
+    return noopBackend();
   }
 }
 
