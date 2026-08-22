@@ -11,6 +11,9 @@ import {
 import AdminLayout from "@/components/admin/AdminLayout";
 import StatCard from "@/components/admin/StatCard";
 
+// Force server-side rendering on every request (no caching)
+export const dynamic = "force-dynamic";
+
 function formatUGX(amount: number): string {
   return `UGX ${Intl.NumberFormat("en-UG").format(amount)}`;
 }
