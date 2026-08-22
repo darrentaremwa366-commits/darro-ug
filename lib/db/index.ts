@@ -312,11 +312,24 @@ class TursoBackend implements DbBackend {
   type: Backend = 'turso';
   constructor(private client: LibsqlClient) {}
   
+  // Force-read-from-primary: do a no-op write before each read.
+  // This ensures the client connects to the primary replica, which has
+  // the latest data. Without this, reads may go to a stale replica.
+  private async forcePrimary(): Promise<void> {
+    try {
+      await this.client.execute(
+        "UPDATE stores SET updated_at = updated_at WHERE id = 'store_darro'"
+      );
+    } catch {
+      // ignore — best effort
+    }
+  }
+  
   async get<T = unknown>(sql: string, params: unknown[] = []): Promise<T | undefined> {
     try {
-      const steps = [{ sql, args: params as any }];
-      const rs = await this.client.batch(steps as any, 'write');
-      const rows = rs[0]?.rows;
+      await this.forcePrimary();
+      const rs = await this.client.execute({ sql, args: params as any });
+      const rows = rs.rows;
       if (!rows || rows.length === 0) return undefined;
       return rowToObject(rows[0]) as T;
     } catch (e) {
@@ -326,9 +339,9 @@ class TursoBackend implements DbBackend {
   }
   async all<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
     try {
-      const steps = [{ sql, args: params as any }];
-      const rs = await this.client.batch(steps as any, 'write');
-      const rows = rs[0]?.rows;
+      await this.forcePrimary();
+      const rs = await this.client.execute({ sql, args: params as any });
+      const rows = rs.rows;
       if (!rows) return [];
       return rows.map((r) => rowToObject(r)) as T[];
     } catch (e) {
