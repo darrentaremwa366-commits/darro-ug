@@ -328,8 +328,9 @@ class TursoBackend implements DbBackend {
   async get<T = unknown>(sql: string, params: unknown[] = []): Promise<T | undefined> {
     try {
       await this.forcePrimary();
-      const rs = await this.client.execute({ sql, args: params as any });
-      const rows = rs.rows;
+      const steps = [{ sql, args: params as any }];
+      const rs = await this.client.batch(steps as any, 'write');
+      const rows = rs[0]?.rows;
       if (!rows || rows.length === 0) return undefined;
       return rowToObject(rows[0]) as T;
     } catch (e) {
@@ -340,8 +341,9 @@ class TursoBackend implements DbBackend {
   async all<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
     try {
       await this.forcePrimary();
-      const rs = await this.client.execute({ sql, args: params as any });
-      const rows = rs.rows;
+      const steps = [{ sql, args: params as any }];
+      const rs = await this.client.batch(steps as any, 'write');
+      const rows = rs[0]?.rows;
       if (!rows) return [];
       return rows.map((r) => rowToObject(r)) as T[];
     } catch (e) {

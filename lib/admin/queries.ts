@@ -102,10 +102,6 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
     jsonAddToCarts = jsonOverview.addToCarts;
     jsonCheckoutStarts = jsonOverview.checkoutStarts;
     jsonPurchases = jsonOverview.purchases;
-    if (jsonSessions > 0) {
-      console.log('[analytics] JSON store primary:',
-        `sessions=${jsonSessions} visitors=${jsonVisitors} pageviews=${jsonPageviews}`);
-    }
   } catch (e) {
     console.warn('[analytics] JSON store read error:', e instanceof Error ? e.message : String(e));
   }
