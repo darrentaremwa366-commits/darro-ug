@@ -106,12 +106,25 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
     console.warn('[analytics] JSON store read error:', e instanceof Error ? e.message : String(e));
   }
 
-  // --- Turso supplement using COUNT(*) with subqueries (avoids DISTINCT bug) ---
+  // --- Turso supplement using subqueries (DISTINCT in subquery works in Turso) ---
+  // Direct COUNT(DISTINCT col) over a filtered table returned 0 in Turso,
+  // but wrapping it as SELECT COUNT(*) FROM (SELECT DISTINCT col ...) works.
   const [
-    dbEventCount, dbNewVisitors, orders,
+    dbSessions, dbVisitors, dbNewVisitors, orders,
     grossSalesUGX, discountsUGX, refundsUGX, netSalesUGX, cogsUGX,
   ] = await Promise.all([
-    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange}`, params),
+    count(
+      `SELECT COUNT(*) AS c FROM (
+         SELECT DISTINCT session_id FROM events WHERE ${inRange}
+       )`,
+      params
+    ),
+    count(
+      `SELECT COUNT(*) AS c FROM (
+         SELECT DISTINCT visitor_id FROM events WHERE ${inRange}
+       )`,
+      params
+    ),
     count(
       `SELECT COUNT(*) AS c FROM visitors v
        WHERE v.store_id = ? AND v.first_seen_at BETWEEN ? AND ?`,
@@ -125,9 +138,10 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
     sum(`SELECT COALESCE(SUM(total_cogs_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
   ]);
 
-  // Derive sessions/visitors from event count when JSON is empty but Turso has data
-  const effectiveSessions = Math.max(jsonSessions, dbEventCount > 0 ? dbEventCount : 0);
-  const effectiveVisitors = Math.max(jsonVisitors, dbEventCount > 0 ? dbEventCount : 0);
+  // JSON store is primary within the same warm container; Turso subqueries
+  // give us cross-container data. Take MAX to never lose a real count.
+  const effectiveSessions = Math.max(jsonSessions, dbSessions);
+  const effectiveVisitors = Math.max(jsonVisitors, dbVisitors);
   const effectiveNewVisitors = Math.max(jsonNewVisitors, dbNewVisitors);
 
   const returningVisitors = Math.max(0, effectiveVisitors - effectiveNewVisitors);
