@@ -67,6 +67,7 @@ export async function GET() {
   let writeTest = 'not_tested';
   let writeError: string | null = null;
   let verifyCount = 0;
+  let writeDetails: Record<string, unknown> = {};
   try {
     const storeId = 'store_darro';
     const testId = 'debug-test-' + Date.now();
@@ -74,26 +75,30 @@ export async function GET() {
     const sessionId = 'debug-session-' + Date.now();
     const now = new Date().toISOString();
     
-    // First insert parent records
-    await queryDb.run(
+    // First insert parent records using the SAME pattern as event API
+    const visResult = await queryDb.run(
       `INSERT INTO visitors (id, store_id, consent_state, first_seen_at, last_seen_at)
-       VALUES (?, ?, 'granted', ?, ?)`,
-      [visitorId, storeId, now, now]
+       VALUES (?, ?, ?, ?, ?)`,
+      [visitorId, storeId, 'granted', now, now]
     );
+    writeDetails.vis_changes = visResult.changes;
     
-    await queryDb.run(
-      `INSERT INTO sessions (id, store_id, visitor_id, landing_path, started_at)
-       VALUES (?, ?, ?, '/debug-test', ?)`,
-      [sessionId, storeId, visitorId, now]
+    const sessResult = await queryDb.run(
+      `INSERT INTO sessions (id, store_id, visitor_id, landing_path, referrer, started_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [sessionId, storeId, visitorId, '/debug-test', null, now]
     );
+    writeDetails.sess_changes = sessResult.changes;
     
-    // Then insert the event
+    // Then insert the event using the SAME pattern as event API
     const writeResult = await queryDb.run(
-      `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at, page_path, referrer, consent_state, schema_version, props_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'granted', 1, null)`,
-      [testId, storeId, visitorId, sessionId, null, 'page_view', now, '/debug-test', null]
+      `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at,
+                           page_path, referrer, consent_state, schema_version, props_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [testId, storeId, visitorId, sessionId, null, 'page_view', now, '/debug-test', null, 'granted', 1, null]
     );
     writeTest = `inserted (changes=${writeResult.changes})`;
+    writeDetails.evt_changes = writeResult.changes;
     
     // Verify the write by reading back
     const verifyRow = await queryDb.get<{ c: number }>(
@@ -169,6 +174,7 @@ export async function GET() {
       write_test: writeTest,
       write_error: writeError,
       write_verify_count: verifyCount,
+      write_details: writeDetails,
     },
     json_store: {
       file_size_bytes: jsonStats.fileSize,
