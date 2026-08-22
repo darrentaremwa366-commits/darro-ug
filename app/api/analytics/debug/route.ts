@@ -112,7 +112,7 @@ export async function GET() {
   }
 
   // Test the exact same queries as getOverviewKpis()
-  let overviewDebug: Record<string, number | string> = {};
+  let overviewDebug: Record<string, unknown> = {};
   try {
     const STORE_ID = 'store_darro';
     const [newVisitorsRow, ordersRow] = await Promise.all([
