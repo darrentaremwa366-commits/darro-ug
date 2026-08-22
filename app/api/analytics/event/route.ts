@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryDb, STORE_ID, nowISO, uuid } from '@/lib/db';
-import { appendEvent, upsertVisitor, upsertSession } from '@/lib/json-event-store';
+import { appendEvent, upsertVisitor, upsertSession, updateEvent } from '@/lib/json-event-store';
 
 const ALLOWED_EVENTS = new Set([
   'page_view',
@@ -209,34 +209,10 @@ export async function POST(req: NextRequest) {
     const now = nowISO();
     const eventId = (body.event_id && typeof body.event_id === 'string') ? body.event_id : uuid();
 
-    const existingEvent = await queryDb.get<{ id: string }>(
-      'SELECT id FROM events WHERE id = ? AND store_id = ?',
-      [eventId, STORE_ID]
-    );
-
-    if (existingEvent) {
-      // Still update visitor/session in JSON store for tracking continuity
-      try {
-        upsertVisitor({
-          id: visitorId,
-          store_id: STORE_ID,
-          consent_state: consentState,
-          first_seen_at: now,
-          last_seen_at: now,
-        });
-        upsertSession({
-          id: sessionId,
-          store_id: STORE_ID,
-          visitor_id: visitorId,
-          started_at: now,
-        });
-      } catch { /* non-critical */ }
-      const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId });
-      setCookies(response, visitorId, sessionId);
-      setCorsHeaders(response, origin);
-      return response;
-    }
-
+    // ============================================================
+    // STEP 0: Parse UTM parameters and classify traffic source
+    // (Done early so both JSON store and DB writes use the same data)
+    // ============================================================
     let pageUtm = {
       utm_source: null as string | null,
       utm_medium: null as string | null,
@@ -263,6 +239,72 @@ export async function POST(req: NextRequest) {
       utm_term: propsUtm.utm_term || pageUtm.utm_term,
     };
     const sourceClass = classifySource(referrer, mergedUtm);
+
+    // ============================================================
+    // STEP 1: Write to JSON store FIRST (primary storage on Vercel)
+    // This ensures events are captured even if the DB layer fails.
+    // On Vercel, the JSON file in /tmp persists across requests
+    // within the same warm container.
+    // ============================================================
+    try {
+      // Upsert visitor in JSON store
+      upsertVisitor({
+        id: visitorId,
+        store_id: STORE_ID,
+        consent_state: consentState,
+        first_seen_at: now,
+        last_seen_at: now,
+      });
+
+      // Upsert session in JSON store (with full UTM attribution data)
+      upsertSession({
+        id: sessionId,
+        store_id: STORE_ID,
+        visitor_id: visitorId,
+        customer_id: null,
+        landing_path: pagePath,
+        referrer: referrer,
+        utm_source: mergedUtm.utm_source,
+        utm_medium: mergedUtm.utm_medium,
+        utm_campaign: mergedUtm.utm_campaign,
+        source_class: sourceClass,
+        started_at: now,
+      });
+
+      // Append event in JSON store
+      appendEvent({
+        id: eventId,
+        store_id: STORE_ID,
+        visitor_id: visitorId,
+        session_id: sessionId,
+        customer_id: null,
+        event_name: eventName,
+        created_at: now,
+        page_path: pagePath,
+        referrer: referrer,
+        consent_state: consentState,
+        schema_version: schemaVersion,
+        props_json: propsJson,
+      });
+    } catch (jsonErr) {
+      console.warn('[analytics] JSON store write failed:',
+        jsonErr instanceof Error ? jsonErr.message : String(jsonErr));
+    }
+
+    // ============================================================
+    // STEP 2: Check for duplicate event in DB (dedup)
+    // ============================================================
+    const existingEvent = await queryDb.get<{ id: string }>(
+      'SELECT id FROM events WHERE id = ? AND store_id = ?',
+      [eventId, STORE_ID]
+    );
+
+    if (existingEvent) {
+      const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId, deduped: true });
+      setCookies(response, visitorId, sessionId);
+      setCorsHeaders(response, origin);
+      return response;
+    }
 
     const existingVisitor = await queryDb.get<{ id: string; consent_state: string; first_seen_at: string }>(
       'SELECT id, consent_state, first_seen_at FROM visitors WHERE id = ? AND store_id = ?',
@@ -401,54 +443,31 @@ export async function POST(req: NextRequest) {
       ]
     );
 
-    // --- JSON store fallback (Vercel-safe persistence in /tmp) ---
-    // When better-sqlite3 native bindings fail on Vercel, the DB falls back
-    // to in-memory SQLite (isolated per lambda). The JSON file in /tmp
-    // persists across requests within the same warm container, giving us
-    // reliable visitor/session tracking. This runs alongside the DB write
-    // so both backends stay in sync.
+    // --- JSON store update (second pass) ---
+    // The event was already written to JSON store in STEP 1.
+    // Here we update with customer_id if it was linked during DB processing.
     try {
-      // Upsert visitor in JSON store
-      upsertVisitor({
-        id: visitorId,
-        store_id: STORE_ID,
-        consent_state: consentState,
-        first_seen_at: now,
-        last_seen_at: now,
-      });
+      // Update visitor/session with customer_id if available
+      if (customerId) {
+        upsertSession({
+          id: sessionId,
+          store_id: STORE_ID,
+          visitor_id: visitorId,
+          customer_id: customerId,
+          landing_path: pagePath,
+          referrer: referrer,
+          utm_source: mergedUtm.utm_source,
+          utm_medium: mergedUtm.utm_medium,
+          utm_campaign: mergedUtm.utm_campaign,
+          source_class: sourceClass,
+          started_at: now,
+        });
 
-      // Upsert session in JSON store
-      upsertSession({
-        id: sessionId,
-        store_id: STORE_ID,
-        visitor_id: visitorId,
-        customer_id: customerId,
-        landing_path: pagePath,
-        referrer: referrer,
-        utm_source: mergedUtm.utm_source,
-        utm_medium: mergedUtm.utm_medium,
-        utm_campaign: mergedUtm.utm_campaign,
-        source_class: sourceClass,
-        started_at: now,
-      });
-
-      // Append event in JSON store
-      appendEvent({
-        id: eventId,
-        store_id: STORE_ID,
-        visitor_id: visitorId,
-        session_id: sessionId,
-        customer_id: customerId,
-        event_name: eventName,
-        created_at: now,
-        page_path: pagePath,
-        referrer: referrer,
-        consent_state: consentState,
-        schema_version: schemaVersion,
-        props_json: propsJson,
-      });
+        // Update the event with customer_id
+        updateEvent(eventId, { customer_id: customerId });
+      }
     } catch (jsonErr) {
-      console.warn('[analytics] JSON store write failed (non-critical):',
+      console.warn('[analytics] JSON store update failed (non-critical):',
         jsonErr instanceof Error ? jsonErr.message : String(jsonErr));
     }
 

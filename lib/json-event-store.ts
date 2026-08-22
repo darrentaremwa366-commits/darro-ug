@@ -130,12 +130,30 @@ export function upsertVisitor(visitor: JsonVisitor): void {
   saveStore(store);
 }
 
-/** Upsert a session. */
+/** Update an existing event (e.g. set customer_id after lookup). */
+export function updateEvent(id: string, updates: Partial<Pick<JsonEvent, 'customer_id' | 'props_json'>>): void {
+  const store = loadStore();
+  const idx = store.events.findIndex((e) => e.id === id);
+  if (idx >= 0) {
+    if (updates.customer_id !== undefined) store.events[idx].customer_id = updates.customer_id;
+    if (updates.props_json !== undefined) store.events[idx].props_json = updates.props_json;
+    saveStore(store);
+  }
+}
+
+/** Upsert a session (update fields if exists, insert if new). */
 export function upsertSession(session: JsonSession): void {
   const store = loadStore();
   const existing = store.sessions.find((s) => s.id === session.id);
   if (existing) {
-    existing.ended_at = session.ended_at || existing.ended_at;
+    // Update all mutable fields
+    if (session.customer_id !== undefined) existing.customer_id = session.customer_id;
+    if (session.ended_at !== undefined) existing.ended_at = session.ended_at;
+    if (session.referrer !== undefined) existing.referrer = session.referrer;
+    if (session.utm_source !== undefined) existing.utm_source = session.utm_source;
+    if (session.utm_medium !== undefined) existing.utm_medium = session.utm_medium;
+    if (session.utm_campaign !== undefined) existing.utm_campaign = session.utm_campaign;
+    if (session.source_class !== undefined) existing.source_class = session.source_class;
   } else {
     store.sessions.push(session);
   }
@@ -200,6 +218,111 @@ export function computeOverviewFromJson(range: { start: string; end: string }): 
 /** Clear all data (useful for testing). */
 export function clearStore(): void {
   saveStore({ events: [], visitors: [], sessions: [], updated_at: new Date(0).toISOString() });
+}
+
+/** Compute top pages from JSON store. */
+export function computeTopPages(range: { start: string; end: string }, limit = 10): Array<{ path: string; views: number; unique_sessions: number }> {
+  const store = loadStore();
+  const events = store.events.filter((e) => {
+    const ts = new Date(e.created_at).getTime();
+    return ts >= new Date(range.start).getTime() && ts <= new Date(range.end).getTime();
+  });
+
+  const pageViews = new Map<string, { views: number; sessions: Set<string> }>();
+  for (const e of events) {
+    if (e.event_name === 'page_view' && e.page_path) {
+      const entry = pageViews.get(e.page_path) || { views: 0, sessions: new Set<string>() };
+      entry.views++;
+      entry.sessions.add(e.session_id);
+      pageViews.set(e.page_path, entry);
+    }
+  }
+
+  return Array.from(pageViews.entries())
+    .map(([path, data]) => ({ path, views: data.views, unique_sessions: data.sessions.size }))
+    .sort((a, b) => b.views - a.views)
+    .slice(0, limit);
+}
+
+/** Compute traffic sources from JSON store. */
+export function computeTrafficSources(range: { start: string; end: string }): Array<{ source: string; sessions: number; events: number; source_class: string }> {
+  const store = loadStore();
+  const events = store.events.filter((e) => {
+    const ts = new Date(e.created_at).getTime();
+    return ts >= new Date(range.start).getTime() && ts <= new Date(range.end).getTime();
+  });
+
+  // Aggregate by session to get source info
+  const sessionMap = new Map<string, { source: string; source_class: string }>();
+  for (const s of store.sessions) {
+    if (s.utm_source) {
+      sessionMap.set(s.id, {
+        source: s.utm_source,
+        source_class: s.source_class || 'utm',
+      });
+    }
+  }
+
+  // Aggregate by referrer for sessions without UTM
+  const sourceStats = new Map<string, { sessions: Set<string>; events: number; source_class: string }>();
+  
+  for (const e of events) {
+    let source: string;
+    let sourceClass: string;
+
+    const sessionInfo = sessionMap.get(e.session_id);
+    if (sessionInfo) {
+      source = sessionInfo.source;
+      sourceClass = sessionInfo.source_class;
+    } else if (e.referrer) {
+      try {
+        const url = new URL(e.referrer);
+        source = url.hostname.replace('www.', '');
+        sourceClass = 'referral';
+      } catch {
+        source = 'direct';
+        sourceClass = 'direct';
+      }
+    } else {
+      source = 'direct';
+      sourceClass = 'direct';
+    }
+
+    const key = `${source}:${sourceClass}`;
+    const entry = sourceStats.get(key) || { sessions: new Set<string>(), events: 0, source_class: sourceClass };
+    entry.sessions.add(e.session_id);
+    entry.events++;
+    sourceStats.set(key, entry);
+  }
+
+  return Array.from(sourceStats.entries())
+    .map(([key, data]) => {
+      const [source, sourceClass] = key.split(':');
+      return { source, sessions: data.sessions.size, events: data.events, source_class: sourceClass };
+    })
+    .sort((a, b) => b.sessions - a.sessions);
+}
+
+/** Compute funnel from JSON store. */
+export function computeFunnel(range: { start: string; end: string }): {
+  sessions: number; productViews: number; addToCarts: number; checkoutStarts: number; purchases: number;
+} {
+  const store = loadStore();
+  const events = store.events.filter((e) => {
+    const ts = new Date(e.created_at).getTime();
+    return ts >= new Date(range.start).getTime() && ts <= new Date(range.end).getTime();
+  });
+
+  const sessionIds = new Set(events.map((e) => e.session_id));
+  const countEvent = (name: string) => events.filter((e) => e.event_name === name).length;
+
+  return {
+    sessions: sessionIds.size,
+    productViews: countEvent('product_view'),
+    addToCarts: countEvent('add_to_cart'),
+    checkoutStarts: countEvent('begin_checkout'),
+    purchases: countEvent('purchase'),
+  };
 }
 
 /** Debug: show store size. */

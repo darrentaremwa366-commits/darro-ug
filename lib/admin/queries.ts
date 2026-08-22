@@ -1,5 +1,13 @@
 import { queryDb, STORE_ID, uuid, nowISO } from '@/lib/db';
-import { computeOverviewFromJson, getEvents, getVisitors as getJsonVisitors, getSessions as getJsonSessions } from '@/lib/json-event-store';
+import {
+  computeOverviewFromJson,
+  computeTopPages,
+  computeTrafficSources,
+  computeFunnel as computeFunnelJson,
+  getEvents,
+  getVisitors as getJsonVisitors,
+  getSessions as getJsonSessions,
+} from '@/lib/json-event-store';
 
 interface DateRange {
   rangeStart?: string;
@@ -226,21 +234,18 @@ export async function getFunnel(range: DateRange & { device?: string; source?: s
     count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'purchase'`, params),
   ]);
 
-  // JSON store fallback when DB returns zero
-  if (productViews === 0 && addToCarts === 0 && checkoutStarts === 0) {
-    try {
-      const events = getEvents({ start, end });
-      const productSlugFilter = range.productSlug;
-      const filtered = events.filter((e) => {
-        if (!productSlugFilter) return true;
-        return !e.props_json || !e.props_json.includes(productSlugFilter);
-      });
-      productViews = new Set(filtered.filter((e) => e.event_name === 'product_view').map((e) => e.session_id)).size;
-      addToCarts = new Set(filtered.filter((e) => e.event_name === 'add_to_cart').map((e) => e.session_id)).size;
-      checkoutStarts = new Set(filtered.filter((e) => e.event_name === 'begin_checkout').map((e) => e.session_id)).size;
-      contactSubmitted = new Set(filtered.filter((e) => e.event_name === 'checkout_contact_submitted').map((e) => e.session_id)).size;
-      purchases = new Set(filtered.filter((e) => e.event_name === 'purchase').map((e) => e.session_id)).size;
-    } catch { /* JSON store empty */ }
+  // JSON store merge: supplement funnel from JSON store
+  // On Vercel, DB may be empty (in-memory SQLite per lambda).
+  // Take MAX of DB and JSON values to never lose data.
+  try {
+    const jsonFunnel = computeFunnelJson({ start, end });
+    productViews = Math.max(productViews, jsonFunnel.productViews);
+    addToCarts = Math.max(addToCarts, jsonFunnel.addToCarts);
+    checkoutStarts = Math.max(checkoutStarts, jsonFunnel.checkoutStarts);
+    contactSubmitted = Math.max(contactSubmitted, jsonFunnel.checkoutStarts); // approximation
+    purchases = Math.max(purchases, jsonFunnel.purchases);
+  } catch (e) {
+    console.warn('[analytics] JSON funnel merge error:', e instanceof Error ? e.message : String(e));
   }
 
   const pct = (num: number, den: number): number => {
@@ -829,32 +834,37 @@ export async function getTopPages(range: DateRange & { limit?: number } = {}): P
     LIMIT ?
   `, [STORE_ID, start, end, limit]);
 
-  // JSON store fallback when DB returns empty
-  if (dbRows.length === 0) {
-    try {
-      const events = getEvents({ start, end });
-      const pageViews = events.filter((e) => e.event_name === 'page_view');
-      if (pageViews.length > 0) {
-        const pageMap = new Map<string, { views: number; visitors: Set<string> }>();
-        for (const e of pageViews) {
-          const path = e.page_path || '/';
-          if (!pageMap.has(path)) {
-            pageMap.set(path, { views: 0, visitors: new Set() });
-          }
-          const entry = pageMap.get(path)!;
-          entry.views++;
-          entry.visitors.add(e.visitor_id);
-        }
-        return Array.from(pageMap.entries())
-          .map(([page_path, data]) => ({
-            page_path,
-            views: data.views,
-            unique_visitors: data.visitors.size,
-          }))
-          .sort((a, b) => b.views - a.views)
-          .slice(0, limit);
+  // --- JSON store merge: supplement top pages from JSON store ---
+  // On Vercel, DB may be empty (in-memory SQLite per lambda).
+  // Merge both sources by taking MAX of views per page_path.
+  try {
+    const jsonPages = computeTopPages({ start, end }, limit);
+    if (jsonPages.length > 0) {
+      // Build a map from DB rows
+      const dbMap = new Map<string, TopPageRow>();
+      for (const row of dbRows) {
+        dbMap.set(row.page_path, row);
       }
-    } catch { /* JSON store empty */ }
+      // Merge JSON rows: take MAX of views and unique_visitors
+      for (const jp of jsonPages) {
+        const existing = dbMap.get(jp.path);
+        if (existing) {
+          existing.views = Math.max(existing.views, jp.views);
+          existing.unique_visitors = Math.max(existing.unique_visitors, jp.unique_sessions);
+        } else {
+          dbMap.set(jp.path, {
+            page_path: jp.path,
+            views: jp.views,
+            unique_visitors: jp.unique_sessions,
+          });
+        }
+      }
+      return Array.from(dbMap.values())
+        .sort((a, b) => b.views - a.views)
+        .slice(0, limit);
+    }
+  } catch (e) {
+    console.warn('[analytics] JSON top pages merge error:', e instanceof Error ? e.message : String(e));
   }
 
   return dbRows;
@@ -878,25 +888,26 @@ export async function getTrafficSources(range: DateRange = {}): Promise<TrafficS
     ORDER BY sessions DESC
   `, [STORE_ID, start, end]);
 
-  // JSON store fallback when DB returns empty
-  let rows = dbRows;
-  if (rows.length === 0) {
-    try {
-      const jsonSessions = getJsonSessions();
-      const filteredSessions = jsonSessions.filter((s) => {
-        const ts = new Date(s.started_at).getTime();
-        return ts >= new Date(start).getTime() && ts <= new Date(end).getTime();
-      });
-      if (filteredSessions.length > 0) {
-        const sourceMap = new Map<string, number>();
-        for (const s of filteredSessions) {
-          const source = s.source_class || 'direct';
-          sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
-        }
-        rows = Array.from(sourceMap.entries()).map(([source_class, sessions]) => ({ source_class, sessions }));
-        rows.sort((a, b) => b.sessions - a.sessions);
+  // --- JSON store merge: supplement traffic sources from JSON store ---
+  // Merge both sources by taking MAX of sessions per source_class.
+  let rows = [...dbRows];
+  try {
+    const jsonSources = computeTrafficSources({ start, end });
+    if (jsonSources.length > 0) {
+      const sourceMap = new Map<string, number>();
+      for (const r of rows) {
+        sourceMap.set(r.source_class, r.sessions);
       }
-    } catch { /* JSON store empty */ }
+      for (const js of jsonSources) {
+        const key = js.source_class || 'direct';
+        sourceMap.set(key, Math.max(sourceMap.get(key) || 0, js.sessions));
+      }
+      rows = Array.from(sourceMap.entries())
+        .map(([source_class, sessions]) => ({ source_class, sessions }))
+        .sort((a, b) => b.sessions - a.sessions);
+    }
+  } catch (e) {
+    console.warn('[analytics] JSON traffic sources merge error:', e instanceof Error ? e.message : String(e));
   }
 
   const total = rows.reduce((s, r) => s + r.sessions, 0) || 1;
