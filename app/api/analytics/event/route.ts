@@ -311,15 +311,16 @@ export async function POST(req: NextRequest) {
       [visitorId, STORE_ID]
     );
 
+    // DB inserts for visitor and session (results captured for debugging)
     if (!existingVisitor) {
-      await queryDb.run(
+      visitorDbResult = await queryDb.run(
         `INSERT INTO visitors (id, store_id, consent_state, first_seen_at, last_seen_at)
          VALUES (?, ?, ?, ?, ?)`,
         [visitorId, STORE_ID, consentState, now, now]
       );
     } else {
       const updateConsent = consentState === 'granted' ? consentState : existingVisitor.consent_state;
-      await queryDb.run(
+      visitorDbResult = await queryDb.run(
         `UPDATE visitors SET consent_state = ?, last_seen_at = ? WHERE id = ? AND store_id = ?`,
         [updateConsent, now, visitorId, STORE_ID]
       );
@@ -331,7 +332,7 @@ export async function POST(req: NextRequest) {
     );
 
     if (!existingSession) {
-      await queryDb.run(
+      sessionDbResult = await queryDb.run(
         `INSERT INTO sessions (id, store_id, visitor_id, landing_path, referrer,
                                utm_source, utm_medium, utm_campaign, utm_content, utm_term,
                                source_class, started_at)
@@ -353,7 +354,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let customerId: string | null = null;
     const props = body.props || {};
     if (eventName === 'purchase' || eventName === 'checkout_contact_submitted' || eventName === 'signup' || eventName === 'login') {
       const customerEmail = (props.customer_email as string) || (props.email as string) || null;
@@ -423,7 +423,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const dbResult = await queryDb.run(
+    dbResult = await queryDb.run(
       `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at,
                            page_path, referrer, consent_state, schema_version, props_json)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -442,6 +442,17 @@ export async function POST(req: NextRequest) {
         propsJson,
       ]
     );
+
+    // Verify the write persisted (read-after-write)
+    try {
+      const verifyRow = await queryDb.get<{ id: string }>(
+        'SELECT id FROM events WHERE id = ?',
+        [eventId]
+      );
+      writeVerified = !!verifyRow;
+    } catch {
+      writeVerified = false;
+    }
 
     // --- JSON store update (second pass) ---
     // The event was already written to JSON store in STEP 1.
@@ -483,7 +494,15 @@ export async function POST(req: NextRequest) {
       await handlePurchase(visitorId, sessionId, customerId, body.props, now);
     }
 
-    const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId, db_changes: dbResult.changes });
+    const response = NextResponse.json({
+      ok: true,
+      visitor_id: visitorId,
+      session_id: sessionId,
+      db_changes: dbResult.changes,
+      write_verified: writeVerified,
+      visitor_db_changes: visitorDbResult.changes,
+      session_db_changes: sessionDbResult.changes,
+    });
     setCookies(response, visitorId, sessionId);
     setCorsHeaders(response, origin);
     return response;
