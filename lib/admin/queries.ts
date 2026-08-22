@@ -1,4 +1,5 @@
 import { queryDb, STORE_ID, uuid, nowISO } from '@/lib/db';
+import { computeOverviewFromJson, getEvents, getVisitors as getJsonVisitors, getSessions as getJsonSessions } from '@/lib/json-event-store';
 
 interface DateRange {
   rangeStart?: string;
@@ -88,7 +89,31 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
     sum(`SELECT COALESCE(SUM(total_cogs_cents),0) AS s FROM orders WHERE store_id = ? AND status NOT IN ('cancelled','refunded') AND created_at BETWEEN ? AND ?`, params),
   ]);
 
-  const returningVisitors = Math.max(0, visitors - newVisitors);
+  // --- JSON store fallback: supplement visitor/session metrics when DB is empty ---
+  // On Vercel, if better-sqlite3 bindings fail, the DB falls back to in-memory
+  // SQLite (isolated per lambda). The JSON file in /tmp persists across requests
+  // within the same warm container, so we use it to recover key metrics.
+  let jsonSessions = 0, jsonVisitors = 0, jsonNewVisitors = 0;
+  let jsonPageviews = 0, jsonAddToCarts = 0, jsonCheckoutStarts = 0, jsonPurchases = 0;
+  if (sessions === 0 && visitors === 0) {
+    try {
+      const jsonOverview = computeOverviewFromJson({ start, end });
+      jsonSessions = jsonOverview.sessions;
+      jsonVisitors = jsonOverview.visitors;
+      jsonNewVisitors = jsonOverview.newVisitors;
+      jsonPageviews = jsonOverview.pageviews;
+      jsonAddToCarts = jsonOverview.addToCarts;
+      jsonCheckoutStarts = jsonOverview.checkoutStarts;
+      jsonPurchases = jsonOverview.purchases;
+    } catch { /* JSON store empty or unavailable */ }
+  }
+
+  // Use DB values if available, otherwise fall back to JSON store
+  const effectiveSessions = sessions > 0 ? sessions : jsonSessions;
+  const effectiveVisitors = visitors > 0 ? visitors : jsonVisitors;
+  const effectiveNewVisitors = newVisitors > 0 ? newVisitors : jsonNewVisitors;
+
+  const returningVisitors = Math.max(0, effectiveVisitors - effectiveNewVisitors);
   const grossProfitUGX = Math.max(0, netSalesUGX - cogsUGX);
   const grossMarginPct = netSalesUGX > 0 ? Math.round((grossProfitUGX / netSalesUGX) * 1000) / 10 : 0;
   const avgOrderValueUGX = orders > 0 ? Math.round(netSalesUGX / orders) : 0;
@@ -111,7 +136,7 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
   const [newCustResult, custRow] = await Promise.all([newCustomers, uniqueCustRow]);
   const totalOrderCustomers = custRow?.c || 0;
   const returningCustomersResult = Math.max(0, totalOrderCustomers - newCustResult);
-  const conversionRatePct = sessions > 0 ? Math.round((orders / sessions) * 1000) / 10 : 0;
+  const conversionRatePct = effectiveSessions > 0 ? Math.round((orders / effectiveSessions) * 1000) / 10 : 0;
 
   const marketingSpendUGX = await sum(
     `SELECT COALESCE(SUM(spend_cents),0) AS s FROM marketing_spend WHERE store_id = ? AND spend_date BETWEEN ? AND ?`,
@@ -120,17 +145,21 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
   const roas = marketingSpendUGX > 0 ? Math.round((netSalesUGX / marketingSpendUGX) * 100) / 100 : 0;
   const cacUGX = newCustResult > 0 ? Math.round(marketingSpendUGX / newCustResult) : 0;
 
-  const [pageviews, addToCarts, checkoutStarts, purchases] = await Promise.all([
-    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'page_view'`, params),
-    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'add_to_cart'`, params),
-    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'begin_checkout'`, params),
-    count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'purchase'`, params),
-  ]);
+  // Use JSON store event counts as fallback when DB is empty
+  const dbPageviews = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'page_view'`, params);
+  const dbAddToCarts = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'add_to_cart'`, params);
+  const dbCheckoutStarts = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'begin_checkout'`, params);
+  const dbPurchases = await count(`SELECT COUNT(*) AS c FROM events WHERE ${inRange} AND event_name = 'purchase'`, params);
+
+  const effectivePageviews = dbPageviews > 0 ? dbPageviews : jsonPageviews;
+  const effectiveAddToCarts = dbAddToCarts > 0 ? dbAddToCarts : jsonAddToCarts;
+  const effectiveCheckoutStarts = dbCheckoutStarts > 0 ? dbCheckoutStarts : jsonCheckoutStarts;
+  const effectivePurchases = dbPurchases > 0 ? dbPurchases : jsonPurchases;
 
   return {
-    sessions,
-    visitors,
-    newVisitors,
+    sessions: effectiveSessions,
+    visitors: effectiveVisitors,
+    newVisitors: effectiveNewVisitors,
     returningVisitors,
     orders,
     newCustomers: newCustResult,
@@ -148,10 +177,10 @@ export async function getOverviewKpis(range: DateRange = {}): Promise<OverviewKp
     marketingSpendUGX,
     roas,
     cacUGX,
-    pageviews,
-    addToCarts,
-    checkoutStarts,
-    purchases,
+    pageviews: effectivePageviews,
+    addToCarts: effectiveAddToCarts,
+    checkoutStarts: effectiveCheckoutStarts,
+    purchases: effectivePurchases,
   };
 }
 
@@ -183,13 +212,30 @@ export async function getFunnel(range: DateRange & { device?: string; source?: s
     params.push(`%"product_slug":"${range.productSlug}"%`);
   }
 
-  const [productViews, addToCarts, checkoutStarts, contactSubmitted, purchases] = await Promise.all([
+  let [productViews, addToCarts, checkoutStarts, contactSubmitted, purchases] = await Promise.all([
     count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'product_view'`, params),
     count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'add_to_cart'`, params),
     count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'begin_checkout'`, params),
     count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'checkout_contact_submitted'`, params),
     count(`SELECT COUNT(DISTINCT e.session_id) AS c FROM events e WHERE ${eventWhere} AND e.event_name = 'purchase'`, params),
   ]);
+
+  // JSON store fallback when DB returns zero
+  if (productViews === 0 && addToCarts === 0 && checkoutStarts === 0) {
+    try {
+      const events = getEvents({ start, end });
+      const productSlugFilter = range.productSlug;
+      const filtered = events.filter((e) => {
+        if (!productSlugFilter) return true;
+        return !e.props_json || !e.props_json.includes(productSlugFilter);
+      });
+      productViews = new Set(filtered.filter((e) => e.event_name === 'product_view').map((e) => e.session_id)).size;
+      addToCarts = new Set(filtered.filter((e) => e.event_name === 'add_to_cart').map((e) => e.session_id)).size;
+      checkoutStarts = new Set(filtered.filter((e) => e.event_name === 'begin_checkout').map((e) => e.session_id)).size;
+      contactSubmitted = new Set(filtered.filter((e) => e.event_name === 'checkout_contact_submitted').map((e) => e.session_id)).size;
+      purchases = new Set(filtered.filter((e) => e.event_name === 'purchase').map((e) => e.session_id)).size;
+    } catch { /* JSON store empty */ }
+  }
 
   const pct = (num: number, den: number): number => {
     if (den <= 0) return 0;
@@ -765,7 +811,7 @@ export interface TopPageRow {
 export async function getTopPages(range: DateRange & { limit?: number } = {}): Promise<TopPageRow[]> {
   const { start, end } = resolveRange(range);
   const limit = range.limit ?? 20;
-  return queryDb.all<TopPageRow>(`
+  const dbRows = await queryDb.all<TopPageRow>(`
     SELECT
       COALESCE(page_path, '/') AS page_path,
       COUNT(*) AS views,
@@ -776,6 +822,36 @@ export async function getTopPages(range: DateRange & { limit?: number } = {}): P
     ORDER BY views DESC
     LIMIT ?
   `, [STORE_ID, start, end, limit]);
+
+  // JSON store fallback when DB returns empty
+  if (dbRows.length === 0) {
+    try {
+      const events = getEvents({ start, end });
+      const pageViews = events.filter((e) => e.event_name === 'page_view');
+      if (pageViews.length > 0) {
+        const pageMap = new Map<string, { views: number; visitors: Set<string> }>();
+        for (const e of pageViews) {
+          const path = e.page_path || '/';
+          if (!pageMap.has(path)) {
+            pageMap.set(path, { views: 0, visitors: new Set() });
+          }
+          const entry = pageMap.get(path)!;
+          entry.views++;
+          entry.visitors.add(e.visitor_id);
+        }
+        return Array.from(pageMap.entries())
+          .map(([page_path, data]) => ({
+            page_path,
+            views: data.views,
+            unique_visitors: data.visitors.size,
+          }))
+          .sort((a, b) => b.views - a.views)
+          .slice(0, limit);
+      }
+    } catch { /* JSON store empty */ }
+  }
+
+  return dbRows;
 }
 
 export interface TrafficSourceRow {
@@ -786,7 +862,7 @@ export interface TrafficSourceRow {
 
 export async function getTrafficSources(range: DateRange = {}): Promise<TrafficSourceRow[]> {
   const { start, end } = resolveRange(range);
-  const rows = await queryDb.all<{ source_class: string; sessions: number }>(`
+  const dbRows = await queryDb.all<{ source_class: string; sessions: number }>(`
     SELECT
       COALESCE(source_class, 'direct') AS source_class,
       COUNT(DISTINCT id) AS sessions
@@ -795,6 +871,27 @@ export async function getTrafficSources(range: DateRange = {}): Promise<TrafficS
     GROUP BY COALESCE(source_class, 'direct')
     ORDER BY sessions DESC
   `, [STORE_ID, start, end]);
+
+  // JSON store fallback when DB returns empty
+  let rows = dbRows;
+  if (rows.length === 0) {
+    try {
+      const jsonSessions = getJsonSessions();
+      const filteredSessions = jsonSessions.filter((s) => {
+        const ts = new Date(s.started_at).getTime();
+        return ts >= new Date(start).getTime() && ts <= new Date(end).getTime();
+      });
+      if (filteredSessions.length > 0) {
+        const sourceMap = new Map<string, number>();
+        for (const s of filteredSessions) {
+          const source = s.source_class || 'direct';
+          sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+        }
+        rows = Array.from(sourceMap.entries()).map(([source_class, sessions]) => ({ source_class, sessions }));
+        rows.sort((a, b) => b.sessions - a.sessions);
+      }
+    } catch { /* JSON store empty */ }
+  }
 
   const total = rows.reduce((s, r) => s + r.sessions, 0) || 1;
   return rows.map((r) => ({

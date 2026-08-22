@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryDb, STORE_ID, nowISO, uuid } from '@/lib/db';
+import { appendEvent, upsertVisitor, upsertSession } from '@/lib/json-event-store';
 
 const ALLOWED_EVENTS = new Set([
   'page_view',
@@ -214,6 +215,22 @@ export async function POST(req: NextRequest) {
     );
 
     if (existingEvent) {
+      // Still update visitor/session in JSON store for tracking continuity
+      try {
+        upsertVisitor({
+          id: visitorId,
+          store_id: STORE_ID,
+          consent_state: consentState,
+          first_seen_at: now,
+          last_seen_at: now,
+        });
+        upsertSession({
+          id: sessionId,
+          store_id: STORE_ID,
+          visitor_id: visitorId,
+          started_at: now,
+        });
+      } catch { /* non-critical */ }
       const response = NextResponse.json({ ok: true, visitor_id: visitorId, session_id: sessionId });
       setCookies(response, visitorId, sessionId);
       setCorsHeaders(response, origin);
@@ -383,6 +400,57 @@ export async function POST(req: NextRequest) {
         propsJson,
       ]
     );
+
+    // --- JSON store fallback (Vercel-safe persistence in /tmp) ---
+    // When better-sqlite3 native bindings fail on Vercel, the DB falls back
+    // to in-memory SQLite (isolated per lambda). The JSON file in /tmp
+    // persists across requests within the same warm container, giving us
+    // reliable visitor/session tracking. This runs alongside the DB write
+    // so both backends stay in sync.
+    try {
+      // Upsert visitor in JSON store
+      upsertVisitor({
+        id: visitorId,
+        store_id: STORE_ID,
+        consent_state: consentState,
+        first_seen_at: now,
+        last_seen_at: now,
+      });
+
+      // Upsert session in JSON store
+      upsertSession({
+        id: sessionId,
+        store_id: STORE_ID,
+        visitor_id: visitorId,
+        customer_id: customerId,
+        landing_path: pagePath,
+        referrer: referrer,
+        utm_source: mergedUtm.utm_source,
+        utm_medium: mergedUtm.utm_medium,
+        utm_campaign: mergedUtm.utm_campaign,
+        source_class: sourceClass,
+        started_at: now,
+      });
+
+      // Append event in JSON store
+      appendEvent({
+        id: eventId,
+        store_id: STORE_ID,
+        visitor_id: visitorId,
+        session_id: sessionId,
+        customer_id: customerId,
+        event_name: eventName,
+        created_at: now,
+        page_path: pagePath,
+        referrer: referrer,
+        consent_state: consentState,
+        schema_version: schemaVersion,
+        props_json: propsJson,
+      });
+    } catch (jsonErr) {
+      console.warn('[analytics] JSON store write failed (non-critical):',
+        jsonErr instanceof Error ? jsonErr.message : String(jsonErr));
+    }
 
     if (eventName === 'add_to_cart' && body.props) {
       await handleAddToCart(visitorId, sessionId, customerId, body.props.cart, body.props.item, now);
