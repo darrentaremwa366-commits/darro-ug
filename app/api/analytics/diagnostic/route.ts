@@ -142,10 +142,12 @@ export async function GET(req: NextRequest) {
 
     if (useTurso()) {
       try {
-        // Fresh client — no shared state with queryDb
+        // Fresh client — no shared state with queryDb. Trim env vars
+        // because Vercel sometimes preserves trailing whitespace/newlines
+        // that cause "Invalid URL" errors.
         const direct = createClient({
-          url: process.env.TURSO_DATABASE_URL!,
-          authToken: process.env.TURSO_AUTH_TOKEN!,
+          url: (process.env.TURSO_DATABASE_URL || '').trim(),
+          authToken: (process.env.TURSO_AUTH_TOKEN || '').trim() || undefined,
         });
         const [dEvt, dVis, dSess] = await Promise.all([
           direct.execute('SELECT COUNT(*) AS c FROM events WHERE store_id = ?', [STORE_ID]),

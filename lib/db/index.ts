@@ -402,7 +402,18 @@ const globalForBackend = globalThis as unknown as {
 };
 
 export function useTurso(): boolean {
-  return !!(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN);
+  return !!(process.env.TURSO_DATABASE_URL?.trim() && process.env.TURSO_AUTH_TOKEN?.trim());
+}
+
+// Trims env vars — Vercel sometimes preserves trailing newlines/whitespace
+// from copy-pasted values, which causes @libsql/client to throw "Invalid URL"
+// and silently fall back to local SQLite (losing all data on redeploy).
+function tursoUrl(): string {
+  return (process.env.TURSO_DATABASE_URL || '').trim();
+}
+function tursoToken(): string | undefined {
+  const t = (process.env.TURSO_AUTH_TOKEN || '').trim();
+  return t || undefined;
 }
 
 async function ensureTursoSeeded(client: LibsqlClient): Promise<void> {
@@ -504,8 +515,8 @@ async function resolveBackend(): Promise<DbBackend> {
     if (useTurso()) {
       try {
         const client = createClient({
-          url: process.env.TURSO_DATABASE_URL!,
-          authToken: process.env.TURSO_AUTH_TOKEN!,
+          url: tursoUrl(),
+          authToken: tursoToken(),
           readYourWrites: true,
         });
         const backend = new TursoBackend(client);
