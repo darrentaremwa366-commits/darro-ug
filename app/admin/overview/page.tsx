@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { getAdminUserFromRequest } from "@/lib/auth";
 import {
   getOverviewKpis,
@@ -55,11 +54,6 @@ async function safe<T,>(fn: () => Promise<T>, fallback: T, label: string): Promi
 export default async function AdminOverview() {
   const user = await getAdminUserFromRequest();
   if (!user) redirect("/admin/login");
-
-  // Set cache-control headers to prevent edge caching
-  const h = await headers();
-  h.set("Cache-Control", "no-store, no-cache, must-revalidate");
-  h.set("Pragma", "no-cache");
 
   // Call each query independently so one failure does not kill all metrics
   const [kpis, timeline, traffic, revenueByCol, topPages, funnel] = await Promise.all([
