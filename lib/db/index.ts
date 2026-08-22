@@ -315,13 +315,43 @@ class SqliteBackend implements DbBackend {
 class TursoBackend implements DbBackend {
   type: Backend = 'turso';
   constructor(private client: LibsqlClient) {}
+  
+  // Helper: execute a read query in a write transaction to ensure
+  // consistent reads from the primary (avoids replica lag issues)
+  private async consistentRead<T>(sql: string, params: unknown[]): Promise<T | undefined> {
+    const tx = await this.client.transaction('write');
+    try {
+      const rs = await tx.execute({ sql, args: params as any });
+      await tx.commit();
+      if (!rs.rows || rs.rows.length === 0) return undefined;
+      return rowToObject(rs.rows[0]) as T;
+    } catch (e) {
+      try { await tx.rollback(); } catch { /* ignore */ }
+      throw e;
+    } finally {
+      try { tx.close(); } catch { /* ignore */ }
+    }
+  }
+  
+  // Helper: execute a read list query in a write transaction
+  private async consistentReadAll<T>(sql: string, params: unknown[]): Promise<T[]> {
+    const tx = await this.client.transaction('write');
+    try {
+      const rs = await tx.execute({ sql, args: params as any });
+      await tx.commit();
+      if (!rs.rows) return [];
+      return rs.rows.map((r) => rowToObject(r)) as T[];
+    } catch (e) {
+      try { await tx.rollback(); } catch { /* ignore */ }
+      throw e;
+    } finally {
+      try { tx.close(); } catch { /* ignore */ }
+    }
+  }
+  
   async get<T = unknown>(sql: string, params: unknown[] = []): Promise<T | undefined> {
     try {
-      const steps = [{ sql, args: params as any }];
-      const rs = await this.client.batch(steps as any, 'write');
-      const rows = rs[0]?.rows;
-      if (!rows || rows.length === 0) return undefined;
-      return rowToObject(rows[0]) as T;
+      return await this.consistentRead<T>(sql, params);
     } catch (e) {
       console.warn('[db] TursoBackend.get failed:', e instanceof Error ? e.message : String(e));
       return undefined;
@@ -329,11 +359,7 @@ class TursoBackend implements DbBackend {
   }
   async all<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
     try {
-      const steps = [{ sql, args: params as any }];
-      const rs = await this.client.batch(steps as any, 'write');
-      const rows = rs[0]?.rows;
-      if (!rows) return [];
-      return rows.map((r) => rowToObject(r)) as T[];
+      return await this.consistentReadAll<T>(sql, params);
     } catch (e) {
       console.warn('[db] TursoBackend.all failed:', e instanceof Error ? e.message : String(e));
       return [];
@@ -490,6 +516,7 @@ async function resolveBackend(): Promise<DbBackend> {
         const client = createClient({
           url: process.env.TURSO_DATABASE_URL!,
           authToken: process.env.TURSO_AUTH_TOKEN!,
+          readYourWrites: true,
         });
         const backend = new TursoBackend(client);
         globalForBackend.backend = backend;
