@@ -101,11 +101,19 @@ export async function GET(req: NextRequest) {
       tursoError = e instanceof Error ? e.message : String(e);
     }
 
+    const tursoUrl = process.env.TURSO_DATABASE_URL || '';
+    const tursoUrlScheme = tursoUrl.startsWith('libsql:') || tursoUrl.startsWith('wss:') || tursoUrl.startsWith('https:')
+      ? 'remote'
+      : tursoUrl.startsWith('file:')
+        ? 'local-file (DATA LOST ON REDEPLOY)'
+        : 'unknown';
+
     // 3. Environment info
     const envInfo = {
       vercel: process.env.VERCEL || false,
       turso_configured: !!(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN),
       turso_url: process.env.TURSO_DATABASE_URL ? '[SET]' : '[NOT SET]',
+      turso_url_scheme: tursoUrlScheme,
       node_env: process.env.NODE_ENV || 'unknown',
     };
 
