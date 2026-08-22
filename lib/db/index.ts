@@ -503,15 +503,18 @@ async function resolveBackend(): Promise<DbBackend> {
         }
         await globalForBackend.seedPromise;
         
-        // Warmup query: ensure the Turso connection is fully ready before
-        // returning. Use a write transaction to establish a consistent connection.
+        // Warmup: force a real write to establish primary connection.
+        // Without this, the first read on a fresh Vercel container may hit a
+        // replica that hasn't received recent writes from other containers.
+        // A no-op UPDATE forces the client to connect to the primary, after
+        // which readYourWrites ensures all subsequent reads see the latest data.
         try {
-          const tx = await client.transaction('write');
-          await tx.execute('SELECT 1');
-          await tx.commit();
-          tx.close();
+          await client.execute(
+            'UPDATE stores SET updated_at = updated_at WHERE id = ?',
+            [STORE_ID]
+          );
           // Small delay to allow the connection to stabilize
-          await new Promise(resolve => setTimeout(resolve, 150));
+          await new Promise(resolve => setTimeout(resolve, 200));
         } catch {
           // Warmup failed but we can still try to use the backend
         }
@@ -554,12 +557,12 @@ export const queryDb = {
     try {
       const b = await resolveBackend();
       const result = await b.get<T>(sql, params ?? []);
-      // Retry twice on Turso if result is empty (first-query staleness / replication lag)
+      // Up to 2 retries on Turso if result is empty (replication lag)
       if ((result === undefined || result === null) && b.type === 'turso') {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        const result2 = await b.get<T>(sql, params ?? []);
-        if (result2 !== undefined && result2 !== null) return result2;
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 400));
+        const retry1 = await b.get<T>(sql, params ?? []);
+        if (retry1 !== undefined && retry1 !== null) return retry1;
+        await new Promise(resolve => setTimeout(resolve, 600));
         return await b.get<T>(sql, params ?? []);
       }
       return result;
@@ -572,12 +575,12 @@ export const queryDb = {
     try {
       const b = await resolveBackend();
       const result = await b.all<T>(sql, params ?? []);
-      // Retry twice on Turso if result is empty (first-query staleness / replication lag)
+      // Up to 2 retries on Turso if result is empty (replication lag)
       if (result.length === 0 && b.type === 'turso') {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        const result2 = await b.all<T>(sql, params ?? []);
-        if (result2.length > 0) return result2;
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 400));
+        const retry1 = await b.all<T>(sql, params ?? []);
+        if (retry1.length > 0) return retry1;
+        await new Promise(resolve => setTimeout(resolve, 600));
         return await b.all<T>(sql, params ?? []);
       }
       return result;

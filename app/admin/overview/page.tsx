@@ -77,15 +77,6 @@ export default async function AdminOverview() {
 
   return (
     <AdminLayout title="Dashboard Overview" subtitle={`Store analytics · Last 30 days · ${user.role}`}>
-      {/* Temporary debug panel */}
-      <section className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded text-xs font-mono">
-        <div className="font-bold mb-2">DEBUG DATA</div>
-        <div>sessions: {kpis.sessions} | visitors: {kpis.visitors} | pageviews: {kpis.pageviews}</div>
-        <div>timeline.length: {timeline.length} | traffic.length: {traffic.length}</div>
-        <div>funnel.productViews: {funnel.productViews} | funnel.steps.length: {funnel.steps.length}</div>
-        <div>kpis.sessions (raw): {JSON.stringify(kpis).substring(0, 200)}</div>
-      </section>
-      
       <section className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-10">
         <StatCard label="Sessions" value={Intl.NumberFormat("en-UG").format(kpis.sessions)} delta={`${kpis.visitors} visitors`} positive />
         <StatCard label="Visitors" value={Intl.NumberFormat("en-UG").format(kpis.visitors)} delta={`${kpis.newVisitors} new`} positive />

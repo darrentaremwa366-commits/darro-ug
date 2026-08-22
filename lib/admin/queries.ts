@@ -39,19 +39,27 @@ function resolveRange(range: DateRange): { start: string; end: string; days: num
 async function count(sql: string, params: unknown[] = []): Promise<number> {
   const row = await queryDb.get<{ c: number }>(sql, params);
   if (row?.c) return row.c;
-  // Retry once after 200ms to handle Turso replication lag
-  await new Promise(resolve => setTimeout(resolve, 200));
+  // Retry after 500ms to handle Turso replication lag (primary connection)
+  await new Promise(resolve => setTimeout(resolve, 500));
   const row2 = await queryDb.get<{ c: number }>(sql, params);
-  return row2?.c || 0;
+  if (row2?.c) return row2.c;
+  // Final retry after 1s
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  const row3 = await queryDb.get<{ c: number }>(sql, params);
+  return row3?.c || 0;
 }
 
 async function sum(sql: string, params: unknown[] = []): Promise<number> {
   const row = await queryDb.get<{ s: number }>(sql, params);
   if (row?.s) return row.s;
-  // Retry once after 200ms to handle Turso replication lag
-  await new Promise(resolve => setTimeout(resolve, 200));
+  // Retry after 500ms to handle Turso replication lag
+  await new Promise(resolve => setTimeout(resolve, 500));
   const row2 = await queryDb.get<{ s: number }>(sql, params);
-  return row2?.s || 0;
+  if (row2?.s) return row2.s;
+  // Final retry after 1s
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  const row3 = await queryDb.get<{ s: number }>(sql, params);
+  return row3?.s || 0;
 }
 
 export interface OverviewKpis {
