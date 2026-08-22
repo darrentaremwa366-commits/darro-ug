@@ -50,8 +50,16 @@ export async function GET(req: NextRequest) {
     let tursoVisitorCount = 0;
     let tursoSessionCount = 0;
     let tursoError: string | null = null;
+    let tursoTables: string[] = [];
+    let tursoHasSeed = false;
 
     try {
+      // Check what tables exist
+      const tables = await queryDb.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+      );
+      tursoTables = tables.map((t) => t.name);
+      
       // Quick warmup query
       const storeRow = await queryDb.get<{ id: string }>(
         'SELECT id FROM stores WHERE id = ?',
@@ -59,6 +67,7 @@ export async function GET(req: NextRequest) {
       );
       if (storeRow) {
         tursoStatus = 'connected';
+        tursoHasSeed = true;
         
         // Quick counts
         const evtCount = await queryDb.get<{ c: number }>(
@@ -78,8 +87,14 @@ export async function GET(req: NextRequest) {
           [STORE_ID]
         );
         tursoSessionCount = sessCount?.c || 0;
+        
+        // Also check if there's ANY data in events (not just filtered by store_id)
+        const anyEvents = await queryDb.get<{ c: number }>(
+          'SELECT COUNT(*) AS c FROM events'
+        );
+        console.log('[diagnostic] Any events in table:', anyEvents?.c || 0);
       } else {
-        tursoStatus = 'no_data';
+        tursoStatus = 'no_seed_data';
       }
     } catch (e) {
       tursoStatus = 'error';
@@ -107,6 +122,8 @@ export async function GET(req: NextRequest) {
       turso: {
         status: tursoStatus,
         error: tursoError,
+        tables: tursoTables,
+        has_seed_data: tursoHasSeed,
         event_count: tursoEventCount,
         visitor_count: tursoVisitorCount,
         session_count: tursoSessionCount,
