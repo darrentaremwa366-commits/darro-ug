@@ -63,24 +63,42 @@ export async function GET() {
   const visitors = getVisitors();
   const sessions = getSessions();
 
-  // Test Turso write to verify writes work
+  // Test Turso write to verify full flow (with parent records)
   let writeTest = 'not_tested';
   let writeError: string | null = null;
   let verifyCount = 0;
   try {
+    const storeId = 'store_darro';
     const testId = 'debug-test-' + Date.now();
+    const visitorId = 'debug-visitor-' + Date.now();
+    const sessionId = 'debug-session-' + Date.now();
     const now = new Date().toISOString();
+    
+    // First insert parent records
+    await queryDb.run(
+      `INSERT INTO visitors (id, store_id, consent_state, first_seen_at, last_seen_at)
+       VALUES (?, ?, 'granted', ?, ?)`,
+      [visitorId, storeId, now, now]
+    );
+    
+    await queryDb.run(
+      `INSERT INTO sessions (id, store_id, visitor_id, landing_path, started_at)
+       VALUES (?, ?, ?, '/debug-test', ?)`,
+      [sessionId, storeId, visitorId, now]
+    );
+    
+    // Then insert the event
     const writeResult = await queryDb.run(
       `INSERT INTO events (id, store_id, visitor_id, session_id, customer_id, event_name, created_at, page_path, referrer, consent_state, schema_version, props_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [testId, 'store_darro', 'debug-visitor', 'debug-session', null, 'page_view', now, '/debug-test', null, 'granted', 1, null]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'granted', 1, null)`,
+      [testId, storeId, visitorId, sessionId, null, 'page_view', now, '/debug-test', null]
     );
     writeTest = `inserted (changes=${writeResult.changes})`;
     
     // Verify the write by reading back
     const verifyRow = await queryDb.get<{ c: number }>(
-      "SELECT COUNT(*) AS c FROM events WHERE visitor_id = ?",
-      ['debug-visitor']
+      "SELECT COUNT(*) AS c FROM events WHERE id = ?",
+      [testId]
     );
     verifyCount = verifyRow?.c || 0;
   } catch (e) {
