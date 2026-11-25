@@ -7,7 +7,7 @@ import brand from "@/data/brand.json";
 const WA_NUMBER_RAW = brand.contact.whatsapp || "";
 const WA_NUMBER = WA_NUMBER_RAW.replace(/[^0-9]/g, "");
 const WA_MESSAGE = encodeURIComponent(
-  "Hi Darro — I saw the website and I'd like to chat about jerseys, sizing, or an order."
+  "Hi Darro — I saw the website and I'd like to chat about t-shirts, sizing, or an order."
 );
 const whatsappUrl = `https://wa.me/${WA_NUMBER}?text=${WA_MESSAGE}`;
 

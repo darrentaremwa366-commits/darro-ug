@@ -46,7 +46,7 @@ export default function SearchFilterBar({
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="relative w-full md:max-w-md">
             <label htmlFor={searchInputId} className="sr-only">
-              Search jerseys
+              Search t-shirts
             </label>
             <svg
               width="18"
@@ -68,7 +68,7 @@ export default function SearchFilterBar({
               type="search"
               value={query}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search teams, leagues, kits..."
+              placeholder="Search colors, styles, sizes..."
               className="w-full border border-[#8A8680]/30 bg-transparent py-2.5 pl-10 pr-4 text-sm text-[#0F0F0F] placeholder:text-[#8A8680] focus:border-[#1A1A1A] focus:outline-none"
             />
           </div>

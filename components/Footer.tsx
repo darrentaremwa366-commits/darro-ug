@@ -25,7 +25,7 @@ export default function Footer() {
               <span className="font-heading text-[#F0EDE8] tracking-[0.18em] text-xl">DARRO</span>
             </div>
             <p className="text-[#8A8680] text-sm leading-relaxed mb-4">
-              The World of the Builder. Premium football jerseys for those who put in the work.
+              For people building their future. Unique, minimal boxy t-shirts. Built in China, worn in Uganda.
             </p>
             <p className="text-[#8A8680] text-xs">Kampala, Uganda</p>
           </div>
@@ -33,9 +33,9 @@ export default function Footer() {
           <div>
             <h4 className="text-[#F0EDE8] text-xs font-heading tracking-[0.18em] mb-4 uppercase">Shop</h4>
             <ul className="space-y-2 text-sm text-[#8A8680]">
-              <li><Link href="/shop" className="hover:text-[#E8E4DD] transition-colors">All Jerseys</Link></li>
-              <li><Link href="/shop?collection=2026/27" className="hover:text-[#E8E4DD] transition-colors">2026/27 Collection</Link></li>
-              <li><Link href="/shop?collection=World%20Cup" className="hover:text-[#E8E4DD] transition-colors">World Cup Jerseys</Link></li>
+              <li><Link href="/shop" className="hover:text-[#E8E4DD] transition-colors">All T-shirts</Link></li>
+              <li><Link href="/shop?collection=Black%20Friday" className="hover:text-[#E8E4DD] transition-colors">Black Friday Drop</Link></li>
+              <li><Link href="/membership" className="hover:text-[#E8E4DD] transition-colors">Darro Club</Link></li>
             </ul>
           </div>
 
@@ -56,7 +56,7 @@ export default function Footer() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search jerseys..."
+                  placeholder="Search t-shirts..."
                   className="flex-1 px-3 py-2 bg-transparent text-sm text-[#F0EDE8] placeholder:text-[#8A8680]/60 focus:outline-none"
                 />
                 <button
@@ -95,7 +95,7 @@ export default function Footer() {
 
         <div className="border-t border-[#8A8680]/30 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#8A8680]">
           <p>© 2026 Darro. All rights reserved. Quiet discipline. Earned belonging.</p>
-          <p className="font-mono uppercase tracking-[0.18em]">The World of the Builder</p>
+          <p className="font-mono uppercase tracking-[0.18em]">For people building their future</p>
         </div>
       </div>
     </footer>

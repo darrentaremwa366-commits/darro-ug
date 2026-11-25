@@ -129,9 +129,9 @@ function ShopContent() {
       <PageHero
         eyebrow="CATALOG"
         title="SHOP ALL"
-        description="Premium football jerseys from the world's top leagues. Delivered across Uganda."
+        description="Unique, minimal boxy t-shirts. Heavyweight cotton. Delivered across Uganda."
         count={filteredProducts.length}
-        countLabel="Jerseys"
+        countLabel="T-shirts"
         align="left"
       />
 
@@ -160,7 +160,7 @@ function ShopContent() {
               </svg>
               <input
                 type="text"
-                placeholder="Search jerseys, teams, leagues..."
+                placeholder="Search t-shirts, colors..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onBlur={(e) => {

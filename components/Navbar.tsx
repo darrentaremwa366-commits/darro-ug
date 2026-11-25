@@ -83,7 +83,7 @@ export default function Navbar() {
                   autoFocus
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
-                  placeholder="Search jerseys — e.g. Man Utd, Arsenal, Brazil..."
+                  placeholder="Search t-shirts — Black, Gray, White..."
                   className="w-full pl-12 pr-4 py-3.5 bg-[#F0EDE8] border border-[#E8E4DD] text-sm placeholder:text-[#8A8680] focus:outline-none focus:border-[#1A1A1A]"
                 />
               </div>
@@ -145,17 +145,17 @@ export default function Navbar() {
               Darro
             </span>
             <span className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-[#8A8680]">
-              The World of the Builder
+              For people building their future
             </span>
           </Link>
 
           <div className="flex items-center justify-end gap-4">
             <button
               type="button"
-              aria-label="Search jerseys"
+              aria-label="Search t-shirts"
               onClick={() => setSearchOpen((s) => !s)}
               className="p-1 hover:opacity-70 transition-opacity"
-              title="Search jerseys"
+              title="Search t-shirts"
             >
               <svg
                 width="20"
@@ -275,7 +275,7 @@ export default function Navbar() {
                     Darro
                   </span>
                   <span className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-[#8A8680]">
-                    The World of the Builder
+                    For people building their future
                   </span>
                 </Link>
                 <button

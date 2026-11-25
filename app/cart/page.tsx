@@ -139,7 +139,7 @@ export default function CartPage() {
           Your cart is quiet
         </h1>
         <p className="mb-10 text-[#5C5344]">
-          Time to browse the collection and find your next jersey.
+          Time to browse the collection and find your next t-shirt.
         </p>
         <Link
           href="/shop"

@@ -20,8 +20,8 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Darro — The World of the Builder",
-  description: "Premium football jerseys. Quiet discipline. Earned belonging. Delivered across Uganda.",
+  title: "Darro — Boxy T-shirts · For People Building Their Future",
+  description: "Unique, minimal, daily-wear boxy t-shirts. 100% heavyweight cotton. Delivered across Uganda. Black Friday — 34,000 UGX a piece.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
