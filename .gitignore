@@ -51,3 +51,5 @@ next-env.d.ts
 # local test scripts and scratch files
 test-event*
 
+
+.vercel

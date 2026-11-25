@@ -15,6 +15,10 @@ import brand from "@/data/brand.json";
 
 const DARRO_WHATSAPP_PHONE = brand.contact.whatsapp;
 
+// Progress bar threshold: buying 3 tees = all 10 jersey entries
+const JERSEY_ENTRIES_THRESHOLD = 3;
+const FREE_DELIVERY_THRESHOLD = 50000; // UGX 50K = free delivery (Makerere)
+
 export default function CartDrawer() {
   const {
     items,
@@ -49,6 +53,46 @@ export default function CartDrawer() {
         }, 0),
       )
     : 0;
+
+  // Count how many physical t-shirts user is buying (for jersey entry)
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const is3OrMore = totalQuantity >= 3;
+
+  const progressValue = Math.min(totalQuantity, JERSEY_ENTRIES_THRESHOLD);
+  const progressPct = (progressValue / JERSEY_ENTRIES_THRESHOLD) * 100;
+  const remaining = Math.max(0, JERSEY_ENTRIES_THRESHOLD - totalQuantity);
+
+  // Cross-sell: other colors not already in cart
+  const cartProductIds = new Set(items.map((i) => i.productId));
+  const crossSellProducts = (productsData as Array<{
+    id: number;
+    slug: string;
+    name: string;
+    color: string;
+    currentPriceUGX: number;
+    memberPriceUGX?: number;
+    images: string[];
+    stockCount: number;
+  }>).filter((p) => !cartProductIds.has(p.id) && p.stockCount > 0);
+
+  const handleAddCrossSell = (product: (typeof crossSellProducts)[number]) => {
+    const finalPrice = memberDiscountActive && product.memberPriceUGX
+      ? product.memberPriceUGX
+      : product.currentPriceUGX;
+    const item = {
+      productId: product.id,
+      slug: product.slug,
+      name: product.name,
+      priceUGX: finalPrice,
+      size: "S",
+      quantity: 1,
+      image: product.images[0] || "/placeholder.svg",
+      memberApplied: memberDiscountActive,
+    };
+    // import lazily to avoid issues
+    const { addToCart } = require("@/lib/store");
+    addToCart(item);
+  };
 
   const handleWhatsAppOrder = (): void => {
     const totals: WhatsappOrderTotals = {
@@ -97,7 +141,7 @@ export default function CartDrawer() {
           >
             <header className="flex items-center justify-between border-b border-[#E8E4DD] px-6 py-5">
               <h2 className="font-heading text-sm uppercase tracking-[0.18em] text-[#0F0F0F]">
-                YOUR CART
+                YOUR CART · {items.length}
               </h2>
               <button
                 type="button"
@@ -144,7 +188,7 @@ export default function CartDrawer() {
                   Your cart is quiet
                 </p>
                 <p className="mb-8 text-sm text-[#8A8680]">
-                  Time to find your next jersey.
+                  Time to pick your next t-shirt.
                 </p>
                 <Link
                   href="/shop"
@@ -157,6 +201,55 @@ export default function CartDrawer() {
               </div>
             ) : (
               <>
+                {/* --- PROGRESS BAR (Day 1 style) --- */}
+                <div className="border-b border-[#E8E4DD] bg-[#FFFBEA] px-6 py-4">
+                  {is3OrMore ? (
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">🎉</span>
+                      <div className="flex-1">
+                        <div className="font-heading text-[11px] uppercase tracking-[0.14em] text-[#2B6B4A]">
+                          You're in all 10 jersey drawings
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#E8E4DD] overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                            className="h-full rounded-full bg-[#2B6B4A]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-[#0F0F0F] leading-tight">
+                          Add{" "}
+                          <span className="font-heading uppercase tracking-[0.12em] text-[#A63D2F]">
+                            {remaining} more
+                          </span>{" "}
+                          → enter{" "}
+                          <span className="font-heading uppercase tracking-[0.12em] text-[#0F0F0F]">
+                            ALL 10 jersey drawings
+                          </span>
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 w-full rounded-full bg-[#E8E4DD] overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progressPct}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                          className="h-full rounded-full bg-[#FFCC00]"
+                        />
+                      </div>
+                      <div className="mt-1 text-[9px] font-mono uppercase tracking-[0.18em] text-[#8A8680]">
+                        {totalQuantity} / {JERSEY_ENTRIES_THRESHOLD} t-shirts · 3 drawings = all 10 days
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* --- CART ITEMS --- */}
                 <div className="flex-1 overflow-y-auto px-6 py-4">
                   <ul className="flex flex-col gap-5">
                     {items.map((item) => {
@@ -216,20 +309,8 @@ export default function CartDrawer() {
                                   className="h-7 w-7 flex items-center justify-center hover:bg-[#E8E4DD] transition-colors text-[#0F0F0F]"
                                 >
                                   {item.quantity <= 1 ? (
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="1.5"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      aria-hidden
-                                    >
-                                      <path d="M3 6h18" />
-                                      <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                                      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                      <path d="M3 6h18" /><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
                                     </svg>
                                   ) : (
                                     <span className="font-heading text-sm leading-none">−</span>
@@ -242,11 +323,7 @@ export default function CartDrawer() {
                                   type="button"
                                   aria-label={`Increase quantity of ${item.name} size ${item.size}`}
                                   onClick={() =>
-                                    updateQty(
-                                      item.productId,
-                                      item.size,
-                                      item.quantity + 1,
-                                    )
+                                    updateQty(item.productId, item.size, item.quantity + 1)
                                   }
                                   className="h-7 w-7 flex items-center justify-center hover:bg-[#E8E4DD] transition-colors text-[#0F0F0F]"
                                 >
@@ -262,8 +339,54 @@ export default function CartDrawer() {
                       );
                     })}
                   </ul>
+
+                  {/* --- CROSS-SELL: Complete your look --- */}
+                  {crossSellProducts.length > 0 && (
+                    <div className="mt-6 pt-5 border-t border-[#E8E4DD]">
+                      <div className="mb-3 font-heading text-[10px] uppercase tracking-[0.22em] text-[#8A8680]">
+                        Mix it up — add another color
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {crossSellProducts.map((p) => {
+                          const displayPrice = memberDiscountActive && p.memberPriceUGX
+                            ? p.memberPriceUGX
+                            : p.currentPriceUGX;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => handleAddCrossSell(p)}
+                              className="group flex flex-col items-center text-center"
+                            >
+                              <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#E8E4DD] mb-1.5 group-hover:ring-2 group-hover:ring-[#0F0F0F] transition-all">
+                                <Image
+                                  src={p.images[0]}
+                                  alt={p.name}
+                                  fill
+                                  sizes="(max-width: 420px) 30vw, 120px"
+                                  className="object-cover"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <span className="bg-[#0F0F0F]/85 text-white px-2 py-0.5 font-heading text-[9px] uppercase tracking-[0.14em]">
+                                    + ADD
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="font-heading text-[9px] uppercase tracking-[0.12em] text-[#0F0F0F] leading-tight line-clamp-1">
+                                {p.color}
+                              </span>
+                              <span className="font-mono text-[9px] text-[#5C5344]">
+                                {formatUGX(displayPrice)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
+                {/* --- FOOTER: Totals + WhatsApp checkout --- */}
                 <footer className="border-t border-[#E8E4DD] px-6 py-5">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
@@ -276,9 +399,7 @@ export default function CartDrawer() {
                     </div>
                     {bundleDiscountUGX > 0 && (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#A63D2F]">
-                          Bundle Discount
-                        </span>
+                        <span className="text-xs text-[#A63D2F]">Bundle Discount</span>
                         <span className="font-heading text-xs uppercase tracking-[0.18em] text-[#A63D2F]">
                           -{formatUGX(bundleDiscountUGX)}
                         </span>
@@ -286,10 +407,8 @@ export default function CartDrawer() {
                     )}
                     {memberSavings > 0 && (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#4A5544]">
-                          Darro Club savings
-                        </span>
-                        <span className="font-heading text-xs uppercase tracking-[0.18em] text-[#4A5544]">
+                        <span className="text-xs text-[#2B6B4A]">Darro Club savings</span>
+                        <span className="font-heading text-xs uppercase tracking-[0.18em] text-[#2B6B4A]">
                           -{formatUGX(memberSavings)}
                         </span>
                       </div>
@@ -325,18 +444,21 @@ export default function CartDrawer() {
                   <button
                     type="button"
                     onClick={handleWhatsAppOrder}
-                    className="button-style mt-5 w-full bg-[#2C2C2C] px-6 py-4 text-xs text-white hover:bg-[#1A1A1A] transition-colors"
+                    className="button-style mt-5 w-full bg-[#0F0F0F] px-6 py-4 text-xs text-white hover:bg-[#2C2C2C] transition-colors"
                   >
                     Order via WhatsApp
                   </button>
 
-                  <Link
-                    href="/cart"
-                    onClick={closeCart}
-                    className="mt-3 block text-center text-xs text-[#5C5344] uppercase tracking-[0.18em] font-heading hover:text-[#0F0F0F] transition-colors"
-                  >
-                    View Full Cart →
-                  </Link>
+                  <div className="mt-3 flex items-center justify-between gap-3 text-[10px] font-mono uppercase tracking-[0.16em] text-[#8A8680]">
+                    <span>Jumia delivery? →</span>
+                    <Link
+                      href={brand.jumia?.link || "/shop"}
+                      onClick={closeCart}
+                      className="hover:text-[#0F0F0F] transition-colors underline underline-offset-4"
+                    >
+                      See Jumia listing
+                    </Link>
+                  </div>
                 </footer>
               </>
             )}

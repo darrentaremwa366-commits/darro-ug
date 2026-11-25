@@ -1,190 +1,98 @@
+"use client";
+
 import Link from "next/link";
-import type { Metadata } from "next";
-import PageHero from "@/components/PageHero";
-import SectionHeader from "@/components/SectionHeader";
-import Reveal from "@/components/Reveal";
-import RevealGroup from "@/components/RevealGroup";
-import RevealItem from "@/components/RevealItem";
 import brand from "@/data/brand.json";
-import { buildWhatsAppUrl } from "@/lib/whatsapp";
-
-export const metadata: Metadata = {
-  title: "Darro Club — Membership — Darro",
-  description:
-    "Join Darro Club for exclusive member prices, early access to new drops, limited offers, and special bundles. Uganda's football jersey community.",
-};
-
-const benefits = brand.club.benefits;
-
-const steps = [
-  {
-    num: "01",
-    title: "JOIN VIA WHATSAPP",
-    desc: "Tap the button below to open our WhatsApp community link. Free to join, no fees ever.",
-  },
-  {
-    num: "02",
-    title: "ACCESS MEMBER PRICES",
-    desc: "Save on every jersey with exclusive Darro Club member pricing across the entire catalog.",
-  },
-  {
-    num: "03",
-    title: "EARLY ACCESS & BUNDLES",
-    desc: "First dibs on new drops, limited bundles, and members-only offers before everyone else.",
-  },
-];
 
 export default function MembershipPage() {
-  const whatsappHref = brand.contact.whatsappGroup;
+  const joinUrl = brand.contact.whatsappGroup;
+  const benefits = brand.club.benefits ?? [];
+  const intro = brand.club.introParagraph ?? "";
 
   return (
-    <div className="flex flex-col">
-      <PageHero
-        eyebrow="MEMBERSHIP"
-        title="DARRO CLUB"
-        description="Belonging is earned. Not bought."
-        align="left"
-      />
-
-      <section className="w-full bg-charcoal text-white py-24 sm:py-28">
-        <div className="max-w-6xl mx-auto px-6">
-          <Reveal>
-            <div className="grid md:grid-cols-2 items-center gap-10 md:gap-16">
-              <div className="flex flex-col gap-6">
-                <h2 className="font-heading uppercase tracking-heading text-3xl sm:text-4xl md:text-5xl leading-[1.1] text-white">
-                  QUIET DISCIPLINE.
-                  <br />
-                  EARNED BELONGING.
-                </h2>
-                <p className="text-sand/70 leading-relaxed max-w-md text-sm sm:text-base">
-                  Darro Club is more than a discount. It&apos;s a circle of
-                  people who show up — to training, to study, to the quiet work
-                  that no one sees. When you join, you&apos;re not just buying a
-                  jersey. You&apos;re wearing the same shirt as people who
-                  respect the grind.
-                </p>
-              </div>
-
-              <div className="bg-white/5 border border-white/10 p-6 sm:p-10 flex flex-col gap-5">
-                <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-sand/80">
-                  MEMBER BENEFITS
-                </div>
-                <ul className="flex flex-col gap-4">
-                  {benefits.map((b, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <div className="pt-0.5 flex-shrink-0">
-                        <svg
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#E8E4DD"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden
-                        >
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-sand/60">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                        <span className="text-sand/90 text-sm sm:text-base leading-relaxed">
-                          {b}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </Reveal>
+    <div className="flex flex-col bg-[#F7F5F2] min-h-screen">
+      {/* --- DARRO CLUB heading --- */}
+      <section className="w-full bg-[#0F0F0F] text-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20 lg:py-24 text-center flex flex-col items-center gap-6">
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/60">
+            MEMBERSHIP
+          </span>
+          <h1 className="font-heading uppercase tracking-[0.14em] text-[clamp(1.8rem,7vw,4rem)] leading-[0.95]">
+            DARRO CLUB
+          </h1>
+          <p className="text-white/60 text-xs sm:text-sm font-mono uppercase tracking-[0.2em]">
+            {brand.club.headline}
+          </p>
         </div>
       </section>
 
-      <section className="w-full max-w-6xl mx-auto px-6 py-24 sm:py-28">
-        <Reveal className="flex flex-col gap-14">
-          <SectionHeader eyebrow="THE PATH" title="HOW MEMBERSHIP WORKS" />
-          <RevealGroup className="grid md:grid-cols-3 gap-10 md:gap-8">
-            {steps.map((s) => (
-              <RevealItem key={s.num}>
-                <div className="flex flex-col gap-4">
-                  <div className="font-heading text-6xl sm:text-7xl tracking-tight text-sand">
-                    {s.num}
-                  </div>
-                  <h3 className="font-heading uppercase tracking-[0.18em] text-base sm:text-lg text-foreground pt-2">
-                    {s.title}
-                  </h3>
-                  <p className="text-stone leading-relaxed text-sm sm:text-base">
-                    {s.desc}
-                  </p>
-                </div>
-              </RevealItem>
+      {/* --- JOIN BUTTON FIRST (mobile-optimized) --- */}
+      <section className="w-full bg-[#F7F5F2] border-t border-[#E8E4DD]">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col items-center text-center gap-6">
+          <a
+            href={joinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="button-style w-full sm:w-auto inline-flex items-center justify-center bg-[#0F0F0F] text-[#F7F5F2] px-8 py-4 text-[11px] font-heading uppercase tracking-[0.18em] hover:bg-[#2C2C2C] transition-colors"
+          >
+            JOIN DARRO CLUB · WHATSAPP
+          </a>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8A8680] leading-relaxed max-w-md">
+            {brand.club.consentText}
+          </p>
+        </div>
+      </section>
+
+      {/* --- PARAGRAPH (brand story) --- */}
+      <section className="w-full bg-[#F7F5F2] border-t border-[#E8E4DD]">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+          <p className="text-[#0F0F0F] text-base sm:text-lg leading-[1.7]">
+            {intro}
+          </p>
+        </div>
+      </section>
+
+      {/* --- BENEFITS --- */}
+      <section className="w-full bg-[#F7F5F2] border-t border-[#E8E4DD]">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col gap-6">
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8A8680]">
+            WHAT YOU GET
+          </span>
+          <ul className="flex flex-col gap-4">
+            {benefits.map((b, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="pt-1 font-mono text-[11px] text-[#A63D2F] flex-shrink-0">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="text-[13px] sm:text-sm text-[#0F0F0F] leading-relaxed">
+                  {b}
+                </span>
+              </li>
             ))}
-          </RevealGroup>
-        </Reveal>
+          </ul>
+        </div>
       </section>
 
-      <section className="w-full max-w-6xl mx-auto px-6 pb-24 sm:pb-28">
-        <Reveal>
-          <div className="max-w-2xl mx-auto border border-sand bg-sand/10 p-8 sm:p-10 text-center flex flex-col gap-5">
-            <div className="font-signature text-4xl sm:text-5xl text-foreground leading-none">
-              {brand.name}
-            </div>
-            <h3 className="font-heading uppercase tracking-heading text-xl sm:text-2xl text-foreground leading-tight">
-              JOIN UGANDA&apos;S FOOTBALL JERSEY COMMUNITY
-            </h3>
-            <a
-              href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="button-style inline-flex items-center justify-center w-full py-4 bg-ink text-white text-[11px] hover:bg-charcoal transition-colors"
-            >
-              JOIN DARRO CLUB · WHATSAPP
-            </a>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-stone leading-relaxed max-w-lg mx-auto mt-2 whitespace-pre-line">
-              {brand.club.consentText}
-            </p>
-          </div>
-        </Reveal>
-      </section>
-
-      <section className="w-full max-w-6xl mx-auto px-6 pb-24 sm:pb-28">
-        <Reveal>
-          <div className="max-w-2xl mx-auto text-center flex flex-col gap-4">
-            <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-stone">
-              STILL NOT SURE?
-            </div>
-            <h3 className="font-heading uppercase tracking-heading text-xl sm:text-2xl text-foreground">
-              QUESTIONS?
-            </h3>
-            <p className="text-stone leading-relaxed max-w-md mx-auto">
-              Floating WhatsApp icon is always on the bottom right of every
-              page. Or message us directly.
-            </p>
-            <a
-              href={buildWhatsAppUrl(
-                brand.contact.whatsapp,
-                "Hello Darro, I have a question about Darro Club membership."
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center mx-auto font-heading uppercase tracking-[0.18em] text-[11px] text-ember hover:underline underline-offset-4 gap-1"
-            >
-              Message us →
-            </a>
-            <div className="pt-6">
-              <Link
-                href="/faq"
-                className="inline-flex items-center justify-center mx-auto font-mono uppercase tracking-[0.18em] text-[11px] text-stone hover:text-foreground transition-colors gap-1"
-              >
-                View FAQ →
-              </Link>
-            </div>
-          </div>
-        </Reveal>
+      {/* --- JOIN LINK AT BOTTOM --- */}
+      <section className="w-full bg-[#F7F5F2] border-t border-[#E8E4DD]">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col items-center text-center gap-4">
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8A8680]">
+            READY?
+          </span>
+          <a
+            href={joinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="button-style w-full sm:w-auto inline-flex items-center justify-center border border-[#0F0F0F] text-[#0F0F0F] px-8 py-3.5 text-[11px] font-heading uppercase tracking-[0.18em] hover:bg-[#0F0F0F] hover:text-[#F7F5F2] transition-colors"
+          >
+            JOIN DARRO CLUB →
+          </a>
+          <Link
+            href="/faq"
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#8A8680] hover:text-[#0F0F0F] transition-colors"
+          >
+            Have questions? View FAQ →
+          </Link>
+        </div>
       </section>
     </div>
   );

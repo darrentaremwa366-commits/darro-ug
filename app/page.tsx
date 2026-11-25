@@ -1,370 +1,414 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { type Product } from "@/components/ProductCard";
-import Reveal from "@/components/Reveal";
-import RevealGroup from "@/components/RevealGroup";
-import RevealItem from "@/components/RevealItem";
-import SectionHeader from "@/components/SectionHeader";
-import OfferBadge from "@/components/OfferBadge";
+import { useEffect, useState } from "react";
 import productsData from "@/data/products.json";
 import brand from "@/data/brand.json";
 
-type CollectionKey = "2026/27" | "World Cup";
+const products = productsData as Array<{
+  id: number;
+  slug: string;
+  name: string;
+  color: string;
+  regularPriceUGX: number;
+  memberPriceUGX: number;
+  currentPriceUGX: number;
+  stockCount: number;
+  bestSeller?: boolean;
+  lowStock?: boolean;
+  lowStockBanner?: string | null;
+  images: string[];
+}>;
 
-const products: Product[] = productsData.map((p) => ({
-  id: String(p.id),
-  slug: p.slug,
-  name: p.name,
-  league: p.league,
-  collection: (p as { collection?: string }).collection,
-  team: p.team,
-  images: p.images.map((src) => ({ src })),
-  regularPriceUGX: p.regularPriceUGX,
-  memberPriceUGX: p.memberPriceUGX,
-  soldOut: p.stockStatus === "soldOut",
-}));
-
-const collection2026 = products.filter((p) => p.collection === "2026/27");
-const worldCupProducts = products.filter((p) => p.collection === "World Cup");
-
-// Only 2 jerseys each. 2026: in-stock first, then sold out
-const featured2026 = collection2026
-  .slice()
-  .sort((a, b) => Number(a.soldOut) - Number(b.soldOut))
-  .slice(0, 2);
-
-// World Cup: Portugal + Argentina first — all sold out
-const featuredWorldCup = worldCupProducts
-  .slice()
-  .sort((a, _b) => {
-    if (a.slug === "portugal-world-cup") return -1;
-    if (a.slug === "argentina-world-cup") return -2;
-    return 0;
-  })
-  .slice(0, 2);
+function formatUGX(amount: number): string {
+  return `UGX ${amount.toLocaleString("en-UG", { maximumFractionDigits: 0 })}`;
+}
 
 export default function Home() {
-  const [activeCollection, setActiveCollection] = useState<CollectionKey>("2026/27");
+  const bundles = (brand.bundles ?? []) as Array<{
+    id: string;
+    label: string;
+    count: number;
+    priceUGX: number;
+    wasPriceUGX: number;
+    saveUGX: number;
+    jerseyEntries: number;
+    highlight?: boolean;
+  }>;
 
-  const activeJerseys =
-    activeCollection === "2026/27" ? featured2026 : featuredWorldCup;
-  const viewAllHref =
-    activeCollection === "2026/27"
-      ? "/shop?collection=2026%2F27"
-      : "/shop?collection=World%20Cup";
+  const isBF = brand.currentSale?.active ?? false;
+  const sale = brand.currentSale;
+
+  const [daysToFriday, setDaysToFriday] = useState(0);
+
+  useEffect(() => {
+    const now = new Date();
+    const day = now.getDay(); // 0 = Sunday, 5 = Friday
+    const daysUntilFriday = (5 - day + 7) % 7 || 7;
+    setDaysToFriday(daysUntilFriday);
+  }, []);
+
+  const trust = brand.trustStrip;
+  const giveaway = brand.jerseyGiveaway;
+
   return (
-    <div className="flex flex-col">
-      {/* SECTION 1: HERO — full landscape, centered */}
-      <section className="relative w-full min-h-[60vh] sm:min-h-[80vh] lg:min-h-screen bg-[#0F0F0F] overflow-hidden">
-        {/* Background image */}
-        <div className="absolute inset-0">
-          <Image
-            src="/images/hero-brand.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover opacity-40"
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0F0F0F]/80 via-[#0F0F0F]/50 to-[#0F0F0F]/80" />
+    <div className="flex flex-col bg-[#F7F5F2] min-h-screen text-[#0F0F0F]">
+      {/* --- TRUST STRIP (always visible, under navbar) --- */}
+      <div className="w-full bg-[#0F0F0F] text-[#F7F5F2]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-center gap-3 sm:gap-8 text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.16em]">
+          <span className="hidden sm:inline">● {trust?.left}</span>
+          <span>● {trust?.middle}</span>
+          <span>● {trust?.right}</span>
         </div>
+      </div>
 
-        <div className="relative max-w-4xl mx-auto px-6 py-16 sm:py-20 lg:py-28 flex flex-col items-center justify-center text-center min-h-[60vh] sm:min-h-[80vh] lg:min-h-screen gap-6 sm:gap-8">
-          <RevealGroup className="flex flex-col items-center gap-6 sm:gap-8 w-full">
-            <RevealItem>
-              <span className="inline-flex font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-[#8A8680]">
-                NEW DROP · SEASON 2026/27
-              </span>
-            </RevealItem>
-            <RevealItem>
-              <h1 className="font-heading uppercase tracking-[0.18em] leading-[0.9] text-[#F7F5F2] text-[clamp(2rem,8vw,5rem)]">
-                <span className="block">THE WORLD</span>
-                <span className="block">OF THE BUILDER</span>
-              </h1>
-            </RevealItem>
-            <RevealItem>
-              <p className="max-w-lg sm:max-w-xl text-[#8A8680] leading-relaxed text-sm sm:text-base lg:text-lg">
-                Premium football jerseys for those who put in the work.
-                Delivered across Uganda.
-              </p>
-            </RevealItem>
-            <RevealItem>
-              <div className="flex flex-col sm:flex-row gap-4 pt-2 sm:pt-4 w-full sm:w-auto">
-                <Link
-                  href="/shop"
-                  className="button-style inline-flex items-center justify-center bg-[#F7F5F2] text-[#0F0F0F] px-8 py-4 text-[11px] hover:bg-white transition-colors"
-                >
-                  SHOP COLLECTION
-                </Link>
-                <Link
-                  href="/membership"
-                  className="button-style inline-flex items-center justify-center border border-[#F7F5F2]/30 text-[#F7F5F2] px-8 py-4 text-[11px] hover:border-[#F7F5F2] hover:bg-[#F7F5F2] hover:text-[#0F0F0F] transition-colors"
-                >
-                  JOIN DARRO CLUB
-                </Link>
+      {/* --- SECTION 1: HERO (beach lifestyle, Tamed Psychotic style) --- */}
+      <section className="relative w-full bg-[#E8E4DD] overflow-hidden">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 flex flex-col items-center text-center gap-6 lg:gap-10">
+          {/* Hero image + text overlay */}
+          <div className="w-full max-w-4xl">
+            <div className="relative w-full aspect-[16/9] lg:aspect-[21/9] bg-[#D8D4CC] overflow-hidden">
+              <Image
+                src="/images/hero-beach.jpg"
+                alt="Darro — beach lifestyle, built for those building their future"
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover brightness-[0.9] contrast-[1.05]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#0F0F0F]/30 via-[#0F0F0F]/10 to-[#0F0F0F]/70" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white px-4">
+                <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.25em] opacity-80 mb-2 sm:mb-3">
+                  {sale?.label ?? "NEW DROP"}
+                </span>
+                <h1 className="font-heading uppercase tracking-[0.18em] text-[clamp(1.4rem,4.8vw,3.2rem)] leading-[0.95] max-w-3xl mx-auto">
+                  STYLISH · MINIMAL · DAILY
+                  <br />
+                  <span className="opacity-90">T-SHIRTS</span>
+                </h1>
+                <p className="mt-3 sm:mt-4 max-w-md text-xs sm:text-sm text-white/80 leading-relaxed">
+                  Unique, not loud. Blend with anything. 100% heavyweight cotton — thick, built to last.
+                </p>
               </div>
-            </RevealItem>
-          </RevealGroup>
+            </div>
+          </div>
+
+          {/* Buttons — Tamed Psychotic: early access + preview drop */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full max-w-md">
+            <Link
+              href="/membership"
+              className="button-style w-full sm:w-auto inline-flex items-center justify-center bg-[#0F0F0F] text-[#F7F5F2] px-6 sm:px-8 py-3 sm:py-3.5 text-[11px] hover:bg-[#2C2C2C] transition-colors"
+            >
+              JOIN DARRO CLUB
+            </Link>
+            <Link
+              href="#offers"
+              className="button-style w-full sm:w-auto inline-flex items-center justify-center border border-[#0F0F0F] text-[#0F0F0F] px-6 sm:px-8 py-3 sm:py-3.5 text-[11px] hover:bg-[#0F0F0F] hover:text-[#F7F5F2] transition-colors"
+            >
+              SEE THE OFFERS →
+            </Link>
+          </div>
+
+          {/* Scarcity strip */}
+          <div className="w-full max-w-lg text-center font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-[#A63D2F]">
+            Only 32 t-shirts total across all colors · Updated Nov 26
+          </div>
         </div>
       </section>
 
-      {/* SECTION 2: JERSEYS — tab switcher + grid */}
-      <section className="w-full py-12 sm:py-16 lg:py-20 bg-[#0F0F0F]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <RevealGroup className="flex flex-col gap-6 sm:gap-8">
-            {/* Tab switcher — client-side toggle, shows only 3 jerseys per tab */}
-            <RevealItem>
-              <div className="flex items-center gap-6 border-b border-[#F7F5F2]/10 pb-4">
-                <button
-                  type="button"
-                  onClick={() => setActiveCollection("2026/27")}
-                  className={
-                    "button-style relative font-heading text-[11px] sm:text-[12px] pb-2 transition-colors " +
-                    (activeCollection === "2026/27"
-                      ? "text-[#F7F5F2]"
-                      : "text-[#8A8680] hover:text-[#F7F5F2]")
-                  }
-                >
-                  2026/27
-                  {activeCollection === "2026/27" && (
-                    <span className="absolute bottom-0 left-0 w-full h-px bg-[#F7F5F2]" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveCollection("World Cup")}
-                  className={
-                    "button-style relative font-heading text-[11px] sm:text-[12px] pb-2 transition-colors uppercase " +
-                    (activeCollection === "World Cup"
-                      ? "text-[#F7F5F2]"
-                      : "text-[#8A8680] hover:text-[#F7F5F2]")
-                  }
-                >
-                  World Cup
-                  {activeCollection === "World Cup" && (
-                    <span className="absolute bottom-0 left-0 w-full h-px bg-[#F7F5F2]" />
-                  )}
-                </button>
-              </div>
-            </RevealItem>
+      {/* --- SECTION 2: BLACK FRIDAY PROJECT — Offer table (Tamed Psychotic style) --- */}
+      <section id="offers" className="w-full bg-[#F7F5F2] border-t border-[#E8E4DD]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+          <div className="mb-8 sm:mb-10 flex items-center justify-between">
+            <div>
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8A8680]">
+                BLACK FRIDAY PROJECT
+              </span>
+              <h2 className="mt-1 font-heading uppercase tracking-[0.14em] text-xl sm:text-2xl text-[#0F0F0F]">
+                3 PRICES. PICK YOURS.
+              </h2>
+            </div>
+            <div className="hidden sm:block font-mono text-[10px] uppercase tracking-[0.22em] text-[#8A8680] text-right leading-relaxed">
+              Prices valid this week only
+            </div>
+          </div>
 
-            {/* Jersey grid — shows ONLY 2 jerseys matching the active tab (no mixing) */}
-            <RevealItem>
-              <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:gap-6 max-w-3xl mx-auto w-full">
-                {activeJerseys.map((p) => (
-                  <Link
-                    key={p.id}
-                    href={`/shop/${p.slug}`}
-                    className="group relative aspect-[3/4] bg-[#1A1A1A] overflow-hidden"
+          {/* Offer cards */}
+          <div className="grid sm:grid-cols-3 gap-4 sm:gap-5">
+            {bundles.map((b) => (
+              <div
+                key={b.id}
+                className={
+                  "relative flex flex-col border p-5 sm:p-6 " +
+                  (b.highlight
+                    ? "border-[#0F0F0F] bg-[#0F0F0F] text-white"
+                    : "border-[#D8D4CC] bg-white text-[#0F0F0F]")
+                }
+              >
+                {b.highlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#A63D2F] text-white font-mono text-[9px] uppercase tracking-[0.22em]">
+                    BEST FOR THE JERSEY
+                  </div>
+                )}
+                <div
+                  className={
+                    "font-heading uppercase tracking-[0.14em] text-base sm:text-lg " +
+                    (b.highlight ? "text-white" : "text-[#0F0F0F]")
+                  }
+                >
+                  {b.label}
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span
+                    className={
+                      "font-heading text-2xl sm:text-3xl tracking-tight " +
+                      (b.highlight ? "text-white" : "text-[#0F0F0F]")
+                    }
                   >
+                    {formatUGX(b.priceUGX)}
+                  </span>
+                  <span
+                    className={
+                      "text-[11px] font-mono line-through " +
+                      (b.highlight ? "text-white/50" : "text-[#8A8680]")
+                    }
+                  >
+                    {formatUGX(b.wasPriceUGX)}
+                  </span>
+                </div>
+                <div
+                  className={
+                    "mt-1 text-[11px] font-mono uppercase tracking-[0.18em] " +
+                    (b.highlight ? "text-[#FFCC00]" : "text-[#A63D2F]")
+                  }
+                >
+                  Save {formatUGX(b.saveUGX)}
+                </div>
+                <div
+                  className={
+                    "mt-4 text-[11px] leading-relaxed " +
+                    (b.highlight ? "text-white/80" : "text-[#5C5344]")
+                  }
+                >
+                  {b.count === 1 && "One boxy tee. Pick your color."}
+                  {b.count === 2 && "Two boxy tees. Mix and match colors."}
+                  {b.count === 3 && "Three boxy tees + you get entries into ALL 10 jersey drawings (not just today's)."}
+                </div>
+                <Link
+                  href="/shop"
+                  className={
+                    "mt-5 button-style inline-flex items-center justify-center px-4 py-2.5 text-[10px] font-heading uppercase tracking-[0.18em] transition-colors " +
+                    (b.highlight
+                      ? "bg-[#F7F5F2] text-[#0F0F0F] hover:bg-white"
+                      : "bg-[#0F0F0F] text-white hover:bg-[#2C2C2C]")
+                  }
+                >
+                  SHOP {b.count} TEES →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* --- SECTION 3: BOXY T-SHIRTS — product grid --- */}
+      <section className="w-full bg-[#F7F5F2] border-t border-[#E8E4DD]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+          <div className="mb-8 flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8A8680]">
+              BOXY T-SHIRTS — {products.length} COLORS
+            </span>
+            <Link
+              href="/shop"
+              className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#A63D2F] hover:underline underline-offset-4"
+            >
+              VIEW ALL →
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+            {products.map((p) => {
+              const isSoldOut = p.stockCount <= 0;
+              return (
+                <Link
+                  key={p.id}
+                  href={`/shop/${p.slug}`}
+                  className="group relative block"
+                >
+                  <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#E8E4DD]">
                     <Image
-                      src={p.images[0]?.src || ""}
+                      src={p.images[0] ?? ""}
                       alt={p.name}
                       fill
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F0F0F]/60 via-transparent to-transparent" />
-                    {p.soldOut && (
-                      <div className="absolute inset-0 bg-[#0F0F0F]/50 flex items-center justify-center">
-                        <span className="inline-flex px-2 py-1 font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.16em] bg-[#0F0F0F]/80 text-white">
+
+                    {/* BESTSELLER tag */}
+                    {p.bestSeller && (
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="inline-flex items-center px-2.5 py-1 bg-[#0F0F0F]/90 text-white font-mono text-[9px] uppercase tracking-[0.22em]">
+                          BESTSELLER
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Low stock banner */}
+                    {p.lowStockBanner && !isSoldOut && (
+                      <div className="absolute top-3 right-3 z-10">
+                        <span className="inline-flex items-center px-2.5 py-1 bg-[#A63D2F] text-white font-mono text-[9px] uppercase tracking-[0.18em]">
+                          {p.lowStockBanner}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Sold Out overlay */}
+                    {isSoldOut && (
+                      <div className="absolute inset-0 bg-[#0F0F0F]/60 flex items-center justify-center z-10">
+                        <span className="bg-white text-[#0F0F0F] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em]">
                           Sold Out
                         </span>
                       </div>
                     )}
-                    <div className="absolute bottom-2 left-2 right-2">
-                      <p className="font-heading text-[9px] sm:text-[10px] uppercase tracking-[0.15em] text-white/90 line-clamp-2 leading-tight">
-                        {p.team || p.name}
-                      </p>
+
+                    {/* Quick add on hover */}
+                    {!isSoldOut && (
+                      <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 z-10">
+                        <div className="w-full py-2.5 font-heading text-[10px] uppercase tracking-[0.18em] bg-[#0F0F0F]/95 text-white text-center">
+                          Quick View →
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 flex flex-col gap-1">
+                    <h3 className="font-heading text-[11px] sm:text-xs uppercase tracking-[0.14em] text-[#0F0F0F] leading-tight">
+                      {p.name}
+                    </h3>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-heading text-[13px] sm:text-sm tracking-[0.14em] text-[#0F0F0F]">
+                        {formatUGX(p.currentPriceUGX)}
+                      </span>
+                      {p.regularPriceUGX > p.currentPriceUGX && (
+                        <span className="text-[10px] font-mono line-through text-[#8A8680]">
+                          {formatUGX(p.regularPriceUGX)}
+                        </span>
+                      )}
                     </div>
-                  </Link>
-                ))}
-              </div>
-            </RevealItem>
-
-            <RevealItem>
-              <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.15em] text-[#8A8680]">
-                <span>DISCOVER →</span>
-                <Link href={viewAllHref} className="hover:text-[#F7F5F2] transition-colors">
-                  VIEW ALL
+                    <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-[0.18em] text-[#8A8680]">
+                      {p.stockCount} left · {p.color}
+                    </div>
+                  </div>
                 </Link>
-              </div>
-            </RevealItem>
-          </RevealGroup>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* SECTION 3: LIMITED BUNDLE OFFER — centered, no side images, no bullets */}
-      <section className="w-full py-16 sm:py-20 lg:py-24 bg-[#F7F5F2]">
-        <div className="max-w-2xl mx-auto px-6 flex flex-col items-center text-center gap-6 sm:gap-8">
-          <RevealGroup className="flex flex-col items-center gap-6 sm:gap-8 w-full">
-            <RevealItem>
-              <OfferBadge text="Limited Bundle Offer" variant="ember" />
-            </RevealItem>
-            <RevealItem>
-              <h2 className="font-heading uppercase tracking-[0.18em] text-2xl sm:text-3xl lg:text-4xl text-[#0F0F0F] leading-tight">
-                2026/27 Jerseys Offer
-                <br />
-                <span className="text-[#A63D2F]">BUY 1 GET 1 FREE</span>
-              </h2>
-            </RevealItem>
-            <RevealItem>
-              <p className="text-[#8A8680] leading-relaxed max-w-lg text-sm sm:text-base">
-                Pick a 2026/27 season jersey. Pair it with a World Cup jersey.
-                Two jerseys shipped together — Arsenal and Man Utd in stock now.
-              </p>
-            </RevealItem>
-            <RevealItem>
-              <p className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.16em] text-[#1A1A1A]">
-                You must be in the Darro Club
-              </p>
-            </RevealItem>
-            <RevealItem>
-              <Link
-                href="/shop"
-                className="button-style inline-flex items-center justify-center w-full sm:w-auto bg-[#2C2C2C] text-white px-8 py-4 text-[11px] hover:bg-[#1A1A1A] transition-colors"
-              >
-                SHOP BUNDLES →
-              </Link>
-            </RevealItem>
-          </RevealGroup>
-        </div>
-      </section>
+      {/* --- SECTION 4: JERSEY GIVEAWAY --- */}
+      {giveaway && (
+        <section className="w-full bg-[#0F0F0F] text-white">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+            <div className="mb-6 flex items-center justify-between">
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/60">
+                JERSEY GIVEAWAY · {giveaway.days} DAYS
+              </span>
+              <span className="hidden sm:block font-mono text-[10px] uppercase tracking-[0.22em] text-[#FFCC00]">
+                10 jerseys to win
+              </span>
+            </div>
 
-      {/* SECTION 4: COLLECTIONS — simple buttons, no images */}
-      <section className="w-full py-12 sm:py-16 bg-[#F7F5F2] border-t border-[#E8E4DD]">
-        <div className="max-w-4xl mx-auto px-6 flex flex-col items-center gap-6 sm:gap-8">
-          <Reveal>
-            <SectionHeader
-              eyebrow="COLLECTIONS"
-              title="BROWSE COLLECTIONS"
-              align="center"
-            />
-          </Reveal>
-          <RevealGroup className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <RevealItem>
-              <Link
-                href="/shop?collection=2026%2F27"
-                className="button-style inline-flex items-center justify-center w-full sm:w-auto border border-[#0F0F0F] text-[#0F0F0F] px-8 py-4 text-[11px] hover:bg-[#0F0F0F] hover:text-white transition-colors"
-              >
-                2026/27 COLLECTION →
-              </Link>
-            </RevealItem>
-            <RevealItem>
-              <Link
-                href="/shop?collection=World%20Cup"
-                className="button-style inline-flex items-center justify-center w-full sm:w-auto border border-[#0F0F0F] text-[#0F0F0F] px-8 py-4 text-[11px] hover:bg-[#0F0F0F] hover:text-white transition-colors"
-              >
-                WORLD CUP JERSEYS →
-              </Link>
-            </RevealItem>
-          </RevealGroup>
-        </div>
-      </section>
-
-      {/* SECTION 5: DARRO CLUB MEMBERSHIP CTA */}
-      <section className="w-full bg-[#2C2C2C] text-white py-16 sm:py-24">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <RevealGroup className="flex flex-col gap-6 order-2 md:order-1">
-              <RevealItem>
-                <span className="font-mono text-xs uppercase tracking-[0.18em] text-white/60">
-                  MEMBERSHIP
-                </span>
-              </RevealItem>
-              <RevealItem>
-                <h2 className="font-heading uppercase tracking-[0.18em] text-2xl sm:text-3xl lg:text-4xl leading-tight">
-                  JOIN UGANDA&apos;S FOOTBALL JERSEY COMMUNITY
-                </h2>
-              </RevealItem>
-              <RevealItem>
-                <p className="text-white/70 leading-relaxed">
-                  {brand.club.headline}. Built for those who put in the work —
-                  early mornings, quiet discipline, progress unseen.
+            <div className="grid md:grid-cols-5 gap-5 lg:gap-6">
+              {/* Left: big jersey card */}
+              <div className="md:col-span-2 bg-[#1A1A1A] border border-white/10 p-5 sm:p-6 flex flex-col gap-4">
+                <div className="aspect-[3/4] bg-[#2C2C2C] flex items-center justify-center relative overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-3/4 h-3/4 border border-white/15 rounded-sm flex items-center justify-center">
+                      <span className="font-heading text-[18px] sm:text-2xl uppercase tracking-[0.2em] text-white/70">
+                        JERSEY
+                      </span>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-3 right-3 font-heading text-[10px] uppercase tracking-[0.18em] text-white/50">
+                    {giveaway.prizePool}
+                  </div>
+                </div>
+                <h3 className="font-heading text-base sm:text-lg uppercase tracking-[0.14em]">
+                  Win a football jersey
+                  <br />
+                  every day for 10 days
+                </h3>
+                <p className="text-white/60 text-[12px] leading-relaxed">
+                  Daily winner announced in the WhatsApp group. Buy tees, join the club — both get you entries.
                 </p>
-              </RevealItem>
-              <RevealItem>
-                <ul className="flex flex-col gap-3 pt-2">
-                  {brand.club.benefits.map((b) => (
-                    <li key={b} className="flex items-start gap-3">
-                      <svg
-                        className="h-4 w-4 mt-0.5 text-[#4A5544] flex-shrink-0"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      <span className="text-sm text-white/80 leading-relaxed">
-                        {b}
+              </div>
+
+              {/* Right: how to enter */}
+              <div className="md:col-span-3 flex flex-col gap-5">
+                <h4 className="font-heading uppercase tracking-[0.14em] text-sm">
+                  HOW YOU GET ENTRIES
+                </h4>
+                <ul className="flex flex-col gap-4">
+                  {(giveaway.howToEnter ?? []).map((line, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <div className="pt-0.5 flex-shrink-0 w-5 h-5 border border-white/30 flex items-center justify-center font-mono text-[10px]">
+                        {i + 1}
+                      </div>
+                      <span className="text-[13px] leading-relaxed text-white/85">
+                        {line}
                       </span>
                     </li>
                   ))}
                 </ul>
-              </RevealItem>
-              <RevealItem>
-                <div className="flex flex-col gap-3 pt-4">
-                  <a
-                    href={brand.contact.whatsappGroup}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="button-style inline-flex items-center justify-center sm:w-auto w-full bg-[#F0EDE8] text-[#1A1A1A] px-8 py-4 text-[11px] hover:bg-white transition-colors"
-                  >
-                    JOIN DARRO CLUB
-                  </a>
-                  <p className="font-mono text-[10px] uppercase leading-relaxed text-white/50 max-w-md tracking-wide">
-                    {brand.club.consentText}
-                  </p>
-                </div>
-              </RevealItem>
-            </RevealGroup>
-
-            <Reveal delay={0.15} className="order-1 md:order-2">
-              <div className="relative bg-white/5 border border-white/10 p-6 sm:p-8">
-                <div className="absolute top-4 right-4 inline-flex items-center gap-1 px-2.5 py-1 bg-[#4A5544] text-white font-mono text-[9px] uppercase tracking-[0.18em]">
-                  FREE {brand.club.freeDeliveryZone.toUpperCase()} DELIVERY
-                </div>
-
-                <div className="flex flex-col gap-6 pt-8">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-signature text-5xl sm:text-6xl text-white/90 leading-none">
-                      Darro
-                    </span>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/50 mt-2">
-                      EARNED · NOT BOUGHT
-                    </span>
-                  </div>
-
-                  <div className="w-full h-px bg-white/10" />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { label: "Member Pricing", icon: "UGX" },
-                      { label: "Early Access", icon: "★" },
-                      { label: "Limited Drops", icon: "◆" },
-                      { label: "Free Delivery", icon: "↻" },
-                    ].map((item) => (
-                      <div
-                        key={item.label}
-                        className="flex flex-col gap-2 p-3 bg-white/5 border border-white/5"
-                      >
-                        <span className="text-lg text-[#4A5544]">{item.icon}</span>
-                        <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/70">
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <Link
+                  href="/shop"
+                  className="mt-1 button-style inline-flex items-center justify-center w-full bg-[#FFCC00] text-[#0F0F0F] px-6 py-3 text-[11px] font-heading uppercase tracking-[0.18em] hover:bg-[#E8B800] transition-colors"
+                >
+                  SHOP 3 TEES FOR 10 ENTRIES →
+                </Link>
               </div>
-            </Reveal>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* --- SECTION 5: ABOUT DARRO + Uncle story --- */}
+      <section className="w-full bg-[#F7F5F2] border-t border-[#E8E4DD]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+          <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#E8E4DD]">
+              <Image
+                src="/images/about-beach.jpg"
+                alt="Darro — beach camping, built in China, worn in Uganda"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
+              />
+            </div>
+            <div className="flex flex-col gap-5">
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8A8680]">
+                ABOUT DARRO
+              </span>
+              <h2 className="font-heading uppercase tracking-[0.14em] text-xl sm:text-2xl leading-tight text-[#0F0F0F]">
+                Built in China.
+                <br />
+                Worn in Uganda.
+              </h2>
+              <p className="text-[#5C5344] text-sm sm:text-base leading-relaxed">
+                {brand.uncleStory}
+              </p>
+              <p className="text-[#5C5344] text-sm sm:text-base leading-relaxed">
+                {brand.shortDescription}. That's why we travel. That's why we build. This tee is for the person who gets it.
+              </p>
+              <Link
+                href="/membership"
+                className="button-style inline-flex items-center justify-center w-full sm:w-auto border border-[#0F0F0F] text-[#0F0F0F] px-6 py-3 text-[11px] font-heading uppercase tracking-[0.18em] hover:bg-[#0F0F0F] hover:text-[#F7F5F2] transition-colors"
+              >
+                JOIN DARRO CLUB →
+              </Link>
+            </div>
           </div>
         </div>
       </section>

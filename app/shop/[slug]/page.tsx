@@ -27,7 +27,7 @@ interface RawProduct {
   relatedProducts: string[];
 }
 
-const allProducts = products as RawProduct[];
+const allProducts = products as unknown as RawProduct[];
 
 export function generateStaticParams() {
   return allProducts.map((p) => ({ slug: p.slug }));

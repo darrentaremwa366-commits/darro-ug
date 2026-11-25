@@ -1,46 +1,125 @@
 {
   "name": "Darro",
-  "tagline": "The World of the Builder",
-  "shortDescription": "Premium football jerseys for those who put in the work. Quiet discipline. Earned belonging.",
-  "worldValues": [
-    "Early mornings",
-    "Quiet discipline",
-    "Training + study",
-    "Faith without noise",
-    "Small circles",
-    "Repetition",
-    "Progress unseen"
+  "tagline": "For people building their future",
+  "shortDescription": "Boxy-fit cotton tees for gym, school, and business. Built in China, worn in Uganda.",
+  "currentSale": {
+    "active": true,
+    "label": "BLACK FRIDAY",
+    "endsAt": "2026-11-30T23:59:59",
+    "singlePriceUGX": 34000,
+    "singleWasUGX": 54000,
+    "priceEnd": "4"
+  },
+  "bundles": [
+    {
+      "id": "1",
+      "label": "Single Tee",
+      "count": 1,
+      "priceUGX": 34000,
+      "wasPriceUGX": 54000,
+      "saveUGX": 20000,
+      "jerseyEntries": 0,
+      "highlight": false
+    },
+    {
+      "id": "2",
+      "label": "2 Tees",
+      "count": 2,
+      "priceUGX": 54000,
+      "wasPriceUGX": 108000,
+      "saveUGX": 54000,
+      "jerseyEntries": 2,
+      "highlight": false
+    },
+    {
+      "id": "3",
+      "label": "3 Tees + Jersey Giveaway",
+      "count": 3,
+      "priceUGX": 74000,
+      "wasPriceUGX": 162000,
+      "saveUGX": 88000,
+      "jerseyEntries": 10,
+      "highlight": true
+    }
   ],
+  "jerseyGiveaway": {
+    "days": 10,
+    "startDate": "2026-11-27",
+    "prizePool": "4 current-season PL/La Liga jerseys + 6 World Cup jerseys",
+    "howToEnter": [
+      "Buy 3 tees — auto-entered for all 10 days (10 entries)",
+      "Buy 2 tees — auto-entered for 2 days",
+      "Join Darro Club on WhatsApp — 1 entry per day you're in the group"
+    ],
+    "dailyWinner": true,
+    "announcementChannel": "WhatsApp Group"
+  },
+  "jumia": {
+    "enabled": true,
+    "bfPriceUGX": 49000,
+    "bfWasUGX": 79000,
+    "afterBFPriceUGX": 69000,
+    "feeNote": "Jumia logistics adds UGX 15,000",
+    "link": "",
+    "label": "Need Jumia delivery? See listing →"
+  },
+  "popups": {
+    "giftAmountUGX": 5700,
+    "giftDurationHours": 48,
+    "giftMessage": "You left something in your cart. Here's 5,700 UGX to make it yours. This only happens for 48 hours and it goes.",
+    "scratchCardEnabled": true,
+    "cartAbandonmentTrigger": true,
+    "productPageDelaySec": 0
+  },
+  "trustStrip": {
+    "left": "100% heavyweight cotton",
+    "middle": "Boxy fit — one size fits most",
+    "right": "Free Makerere delivery"
+  },
+  "nextDropBanner": {
+    "autoFridayMode": true,
+    "bfWeek": "BLACK FRIDAY — 34,000 UGX a piece"
+  },
+  "club": {
+    "name": "Darro Club",
+    "headline": "For people building their future",
+    "introParagraph": "Darro is for people who are building something for their future. People in the gym doing their reps. Students grinding for better careers, better jobs, better businesses. People building businesses. People learning skills, developing themselves, growing spiritually, passionate about something and doing it. That's the essence of Darro. I'm Darren — I'm going through the same journey. This brand is for that person.",
+    "benefits": [
+      "Exclusive member prices (same as Friday drop pricing, every day)",
+      "Early access to Friday drops — 24 hours before everyone else",
+      "Free delivery around Makerere University",
+      "Win a football jersey every week",
+      "Weekly behind-the-scenes from China"
+    ],
+    "freeDeliveryZone": "Makerere University",
+    "consentText": "By joining Darro Club you consent to receive occasional WhatsApp messages about new drops and club updates. No spam, ever."
+  },
+  "uncleStory": "This drop is dedicated to my uncle — the man who taught me to work hard, be a man, travel, and enjoy life. Freedom comes at a cost.",
   "contact": {
     "whatsapp": "+86 158 1740 4017",
     "whatsappGroup": "https://chat.whatsapp.com/F2CQD00DWPU7m4buAcXwH3?s=cl&p=a&ilr=1",
     "email": "hello@darro.co",
     "address": "Makerere, Kampala, Uganda",
-    "country": "Uganda 🇺🇬"
+    "country": "Uganda"
   },
   "social": {
     "instagram": "https://www.instagram.com/darro.clo/",
     "tiktok": ""
   },
-  "club": {
-    "name": "Darro Club",
-    "headline": "Join Uganda's football jersey community",
-    "benefits": [
-      "Exclusive member prices",
-      "Early access to new drops",
-      "Limited offers",
-      "Special bundles",
-      "Free delivery around Makerere University"
-    ],
-    "freeDeliveryZone": "Makerere University",
-    "consentText": "By joining Darro Club you consent to receive recurring automated promotional and personalized marketing messages about new drops only. Consent is not a condition of any purchase."
-  },
   "delivery": {
     "zones": [
-      "Nationwide delivery across Uganda"
+      "Makerere University (free)",
+      "Kampala Metropolitan",
+      "Nationwide"
     ],
-    "freeZone": "Free delivery around Makerere University",
-    "timeline": "3-5 working days after order confirmation via WhatsApp",
-    "feeNote": "Delivery fees apply based on location"
+    "freeZone": "Makerere University",
+    "timeline": "3-5 working days",
+    "feeNote": "Fees based on location — we confirm after order"
+  },
+  "mtnMoMo": {
+    "enabled": false,
+    "merchantCode": "PENDING",
+    "ussdCode": "*165*3#",
+    "merchantName": "Darro"
   }
 }
