@@ -18,6 +18,21 @@ function formatUGX(amount: number): string {
   return `UGX ${amount.toLocaleString("en-UG", { maximumFractionDigits: 0 })}`;
 }
 
+// --- Countdown: Nov 27 → Dec 7 (10 days of jersey giveaway) ---
+function useCountdown(target: Date) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const diff = Math.max(0, target.getTime() - now.getTime());
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const mins = Math.floor((diff / (1000 * 60)) % 60);
+  const secs = Math.floor((diff / 1000) % 60);
+  return { days, hours, mins, secs, done: diff === 0 };
+}
+
 export default function Home() {
   const bundles = (brand.bundles ?? []) as Array<{
     id: string; label: string; count: number; priceUGX: number;
@@ -28,27 +43,87 @@ export default function Home() {
   const giveaway = brand.jerseyGiveaway;
   const router = useRouter();
 
+  // --- Pop-up: first visit only ---
+  const [showPopup, setShowPopup] = useState(false);
+  useEffect(() => {
+    const KEY = "darro-popup-shown";
+    if (typeof window !== "undefined" && !localStorage.getItem(KEY)) {
+      const t = setTimeout(() => setShowPopup(true), 1800);
+      return () => clearTimeout(t);
+    }
+  }, []);
+  const dismissPopup = () => {
+    setShowPopup(false);
+    localStorage.setItem("darro-popup-shown", "1");
+  };
+
+  // --- Jersey giveaway countdown: 10 days from Nov 27 ---
+  const giveEnd = new Date("2026-12-07T23:59:59");
+  const { days, hours, mins, secs } = useCountdown(giveEnd);
+
+  // --- Buyer tracker (optimistic — increments from this device) ---
+  const [buyerCount, setBuyerCount] = useState(0);
+  useEffect(() => {
+    const KEY = "darro-jersey-buyers";
+    const saved = parseInt(localStorage.getItem(KEY) ?? "0", 10);
+    setBuyerCount(saved);
+  }, []);
+
+  // Bundle CTA — go directly to the black product page
+  const blackSlug = products.find((p) => p.color.toLowerCase().includes("black"))?.slug ?? "boxy-tshirt-black";
+
   function addToCartDirect(slug: string, qty: number) {
-    // Redirect to cart with a direct add (simulate by going to shop then adding via URL)
     router.push(`/shop/${slug}?add=${qty}`);
   }
 
-  // Find the black product slug
-  const blackSlug = products.find((p) => p.color.toLowerCase().includes("black"))?.slug ?? "boxy-tshirt-black";
-
   return (
     <div className="flex flex-col bg-[#F7F5F2] min-h-screen text-[#0F0F0F]">
+
+      {/* --- FIRST-VISIT POP-UP (Day One style) --- */}
+      {showPopup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm" onClick={dismissPopup}>
+          <div className="relative max-w-md w-full bg-[#0F0F0F] text-white border border-white/15 p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={dismissPopup}
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center border border-white/30 text-white/70 hover:text-white hover:border-white transition-colors font-mono text-sm"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+            <div className="flex flex-col gap-4">
+              <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#FFCC00]">
+                BLACK FRIDAY DROP · LIVE NOW
+              </span>
+              <h3 className="font-heading uppercase tracking-[0.14em] text-xl sm:text-2xl leading-[0.95]">
+                Up to
+                <br />
+                UGX 88,000 off
+              </h3>
+              <p className="text-white/70 text-sm leading-relaxed">
+                1 t-shirt for <span className="text-white font-heading">UGX 34,000</span> · was 54,000.
+                <br />
+                First 10 buyers win a football jersey free.
+              </p>
+              <Link
+                href="/shop"
+                onClick={dismissPopup}
+                className="mt-1 w-full py-3 bg-[#FFCC00] text-[#0F0F0F] text-[11px] font-heading uppercase tracking-[0.2em] text-center hover:bg-[#E8B800] transition-colors"
+              >
+                Shop T-Shirts Now
+              </Link>
+              <button onClick={dismissPopup} className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 hover:text-white/70 transition-colors text-center">
+                No thanks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- SECTION 1: HERO --- */}
       <section className="relative w-full bg-[#0F0F0F] overflow-hidden">
         <picture className="absolute inset-0">
           <source media="(max-width: 768px)" srcSet="/images/tee-black-front.png" />
-          <Image
-            src="/images/hero-beach.jpg"
-            alt="DARRO — World of a Builder"
-            fill priority sizes="100vw"
-            className="object-cover object-center md:object-top brightness-[0.65] contrast-[1.05]"
-          />
+          <Image src="/images/hero-beach.jpg" alt="DARRO — World of a Builder" fill priority sizes="100vw" className="object-cover object-center md:object-top brightness-[0.65] contrast-[1.05]" />
         </picture>
         <div className="absolute inset-0 bg-gradient-to-b from-[#0F0F0F]/40 via-[#0F0F0F]/20 to-[#0F0F0F]/85" />
 
@@ -98,29 +173,19 @@ export default function Home() {
               return (
                 <div key={b.id} className={
                   "relative flex flex-col border overflow-hidden " +
-                  (isBlack
-                    ? "border-[#0F0F0F] bg-[#0F0F0F] text-white"
-                    : "border-[#D8D4CC] bg-white text-[#0F0F0F]")
+                  (isBlack ? "border-[#0F0F0F] bg-[#0F0F0F] text-white"
+                           : "border-[#D8D4CC] bg-white text-[#0F0F0F]")
                 }>
                   {isBlack && (
                     <div className="absolute top-3 right-3 z-10 px-2.5 py-1 bg-[#A63D2F] text-white font-mono text-[9px] uppercase tracking-[0.2em]">
                       BEST VALUE
                     </div>
                   )}
-
-                  {/* Small product image */}
                   {b.image && (
-                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#E8E4DD] border-b border-[#E8E4DD]">
-                      <Image
-                        src={b.image}
-                        alt={b.label}
-                        fill
-                        sizes="(max-width: 640px) 50vw, 33vw"
-                        className="object-cover"
-                      />
+                    <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-[#E8E4DD]">
+                      <Image src={b.image} alt={b.label} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-cover" />
                     </div>
                   )}
-
                   <div className="flex flex-col p-5 sm:p-5 flex-1">
                     <div className={"font-heading uppercase tracking-[0.14em] text-base sm:text-lg " + (isBlack ? "text-white" : "text-[#0F0F0F]")}>
                       {b.label}
@@ -128,7 +193,6 @@ export default function Home() {
                     <div className={"mt-1 text-[11px] font-mono uppercase tracking-[0.18em] " + (isBlack ? "text-white/60" : "text-[#8A8680]")}>
                       {b.subtitle}
                     </div>
-
                     <div className="mt-4 flex items-baseline gap-2">
                       <span className={"font-heading text-2xl sm:text-3xl tracking-tight " + (isBlack ? "text-white" : "text-[#0F0F0F]")}>
                         {formatUGX(b.priceUGX)}
@@ -140,15 +204,12 @@ export default function Home() {
                     <div className={"mt-1 text-[11px] font-mono uppercase tracking-[0.18em] " + (isBlack ? "text-[#FFCC00]" : "text-[#A63D2F]")}>
                       Save {formatUGX(b.saveUGX)}
                     </div>
-
-                    {/* Direct add-to-cart CTA */}
                     <button
                       onClick={() => addToCartDirect(blackSlug, b.count)}
                       className={
                         "mt-5 w-full py-2.5 text-[10px] font-heading uppercase tracking-[0.18em] transition-colors cursor-pointer " +
-                        (isBlack
-                          ? "bg-[#F7F5F2] text-[#0F0F0F] hover:bg-white"
-                          : "bg-[#0F0F0F] text-white hover:bg-[#2C2C2C]")
+                        (isBlack ? "bg-[#F7F5F2] text-[#0F0F0F] hover:bg-white"
+                                 : "bg-[#0F0F0F] text-white hover:bg-[#2C2C2C]")
                       }
                     >
                       Shop {b.count} T-Shirt{b.count > 1 ? "s" : ""}
@@ -161,7 +222,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- SECTION 3: BLACK FRIDAY CALENDAR (SIMPLIFIED — just dates) --- */}
+      {/* --- SECTION 3: BLACK FRIDAY CALENDAR --- */}
       <section className="w-full bg-[#F7F5F2] border-t border-[#E8E4DD]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
           <div className="mb-6 flex items-center justify-between">
@@ -177,20 +238,12 @@ export default function Home() {
               UGX 34,000 · was 54,000 · valid on drop day only
             </div>
           </div>
-
-          {/* Simple horizontal date list — no big boxes */}
           <div className="flex flex-wrap gap-x-6 gap-y-3 sm:gap-x-10 items-center">
             {bfDates.map((d, i) => (
               <div key={d.date} className="flex items-center gap-2 sm:gap-3">
-                <div className="font-heading text-sm sm:text-base uppercase tracking-[0.1em] text-[#0F0F0F]">
-                  {d.date}
-                </div>
-                <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.18em] text-[#A63D2F]">
-                  {d.label}
-                </div>
-                {i < bfDates.length - 1 && (
-                  <div className="hidden sm:block w-6 h-px bg-[#D8D4CC] ml-2" />
-                )}
+                <div className="font-heading text-sm sm:text-base uppercase tracking-[0.1em] text-[#0F0F0F]">{d.date}</div>
+                <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.18em] text-[#A63D2F]">{d.label}</div>
+                {i < bfDates.length - 1 && <div className="hidden sm:block w-6 h-px bg-[#D8D4CC] ml-2" />}
               </div>
             ))}
           </div>
@@ -208,7 +261,6 @@ export default function Home() {
               View All
             </Link>
           </div>
-
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
             {products.map((p) => {
               const isSoldOut = p.stockCount <= 0;
@@ -256,7 +308,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- SECTION 5: JERSEY GIVEAWAY --- */}
+      {/* --- SECTION 5: JERSEY GIVEAWAY (COUNTDOWN + BUYER TRACKER) --- */}
       {giveaway && (
         <section id="giveaway" className="w-full bg-[#0F0F0F] text-white">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
@@ -267,6 +319,54 @@ export default function Home() {
               <span className="hidden sm:block font-mono text-[10px] uppercase tracking-[0.22em] text-[#FFCC00]">
                 First {giveaway.firstNBuyers ?? 10} buyers win
               </span>
+            </div>
+
+            {/* Countdown + Buyer tracker bar */}
+            <div className="mb-8 grid sm:grid-cols-2 gap-4">
+              {/* Countdown */}
+              <div className="bg-[#1A1A1A] border border-white/10 p-4 sm:p-5">
+                <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/50 mb-3">
+                  Giveaway ends in
+                </div>
+                <div className="flex gap-3 sm:gap-4">
+                  {[
+                    { v: days, l: "Days" },
+                    { v: hours, l: "Hrs" },
+                    { v: mins, l: "Min" },
+                    { v: secs, l: "Sec" },
+                  ].map(({ v, l }) => (
+                    <div key={l} className="flex-1 text-center">
+                      <div className="font-heading text-2xl sm:text-3xl tabular-nums text-white">
+                        {String(v).padStart(2, "0")}
+                      </div>
+                      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40 mt-1">{l}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Buyer tracker */}
+              <div className="bg-[#1A1A1A] border border-white/10 p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/50">
+                    Buyers entered
+                  </div>
+                  <div className="font-heading text-sm text-[#FFCC00]">
+                    {Math.min(buyerCount, giveaway.firstNBuyers ?? 10)} / {giveaway.firstNBuyers ?? 10}
+                  </div>
+                </div>
+                <div className="h-2 bg-white/10 w-full">
+                  <div
+                    className="h-full bg-[#FFCC00] transition-all duration-500"
+                    style={{ width: `${Math.min(100, (buyerCount / (giveaway.firstNBuyers ?? 10)) * 100)}%` }}
+                  />
+                </div>
+                <div className="mt-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
+                  {buyerCount >= (giveaway.firstNBuyers ?? 10)
+                    ? "All jerseys claimed — stay tuned!"
+                    : `${(giveaway.firstNBuyers ?? 10) - buyerCount} spots left`}
+                </div>
+              </div>
             </div>
 
             <div className="grid md:grid-cols-5 gap-5 lg:gap-6">
@@ -288,7 +388,7 @@ export default function Home() {
                   <br />Be first. Win a jersey.
                 </h3>
                 <p className="text-white/60 text-[12px] leading-relaxed">
-                  First {giveaway.firstNBuyers ?? 10} people to buy any order through darro-ug.vercel.app — each gets a football jersey free. All 5 jerseys shown below.
+                  First {giveaway.firstNBuyers ?? 10} people to buy any order through darro-ug.vercel.app — each gets a football jersey free.
                 </p>
               </div>
 
@@ -308,7 +408,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Jersey strip — all 5 */}
+            {/* Jersey strip */}
             <div className="mt-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               {[
                 { src: "/images/products/arsenal-home-2026/front.jpg", alt: "Arsenal" },

@@ -25,7 +25,7 @@
       "priceUGX": 34000,
       "wasPriceUGX": 54000,
       "saveUGX": 20000,
-      "image": "/images/tee-black-front.png",
+      "image": "/images/bundle-1-black.png",
       "subtitle": "Boxy fit · pick your color",
       "highlight": false
     },
@@ -36,7 +36,7 @@
       "priceUGX": 54000,
       "wasPriceUGX": 108000,
       "saveUGX": 54000,
-      "image": "/images/tee-black-ground.png",
+      "image": "/images/bundle-2-black.png",
       "subtitle": "Best value · mix colors",
       "highlight": true
     },
@@ -47,16 +47,16 @@
       "priceUGX": 74000,
       "wasPriceUGX": 162000,
       "saveUGX": 88000,
-      "image": "/images/tee-black-side.png",
+      "image": "/images/bundle-3-black.png",
       "subtitle": "Maximum savings",
       "highlight": false
     }
   ],
   "offers": [
-    { "text": "Black Friday — UGX 34,000 · was 54,000", "href": "/shop" },
-    { "text": "2 t-shirts — UGX 54,000 · was 108,000 · save 54K", "href": "/shop" },
-    { "text": "3 t-shirts — UGX 74,000 · was 162,000 · save 88K", "href": "/shop" },
-    { "text": "First 10 buyers get a football jersey free · 10 days only", "href": "/#giveaway" }
+    { "text": "Buy 1 T-shirt · save UGX 20,000", "href": "/shop" },
+    { "text": "Buy 2 T-shirts · save UGX 54,000", "href": "/shop" },
+    { "text": "Buy 3 T-shirts · save UGX 88,000", "href": "/shop" },
+    { "text": "First 10 buyers · win a football jersey", "href": "/#giveaway" }
   ],
   "jerseyGiveaway": {
     "days": 10,

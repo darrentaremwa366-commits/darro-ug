@@ -46,20 +46,26 @@ export default function Navbar() {
     }
   };
 
-  const stripText = offers.map((o) => o.text).join("   •   ");
+  const stripItems = offers.map((o) => o.text);
+
+  // Duplicate for seamless scroll
+  const stripLoop = [...stripItems, ...stripItems];
 
   return (
     <header className="sticky top-0 z-40 w-full bg-[#F7F5F2] border-b border-[#E8E4DD]">
-      {/* --- MOVING OFFER STRIP (scrolling left → right to left) --- */}
-      <div className="w-full bg-[#0F0F0F] text-[#F7F5F2] overflow-hidden relative">
-        <div className="relative whitespace-nowrap overflow-hidden">
+      {/* --- MOVING OFFER STRIP — big spacing between each offer --- */}
+      <div className="w-full bg-[#0F0F0F] text-[#F7F5F2] overflow-hidden">
+        <div className="relative whitespace-nowrap overflow-hidden py-2.5">
           <div className="banner-track inline-flex whitespace-nowrap">
-            <span className="inline-block py-2 px-8 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em] flex-shrink-0">
-              ● {stripText}
-            </span>
-            <span className="inline-block py-2 px-8 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em] flex-shrink-0" aria-hidden>
-              ● {stripText}
-            </span>
+            {stripLoop.map((text, i) => (
+              <span
+                key={i}
+                className="inline-block font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em] flex-shrink-0"
+                style={{ paddingLeft: "4rem", paddingRight: "4rem" }}
+              >
+                • {text}
+              </span>
+            ))}
           </div>
         </div>
         <style jsx global>{`
@@ -68,7 +74,7 @@ export default function Navbar() {
             to   { transform: translateX(-50%); }
           }
           .banner-track {
-            animation: bannerScroll 40s linear infinite;
+            animation: bannerScroll 45s linear infinite;
             display: inline-flex;
             width: max-content;
           }
