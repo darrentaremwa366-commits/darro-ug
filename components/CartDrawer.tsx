@@ -15,7 +15,7 @@ import brand from "@/data/brand.json";
 
 const DARRO_WHATSAPP_PHONE = brand.contact.whatsapp;
 
-// Progress bar threshold: buying 3 tees = all 10 jersey entries
+// Progress bar threshold: first 10 buyers win a jersey
 const JERSEY_ENTRIES_THRESHOLD = 3;
 const FREE_DELIVERY_THRESHOLD = 50000; // UGX 50K = free delivery (Makerere)
 

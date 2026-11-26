@@ -376,7 +376,7 @@ export default function CartPage() {
                               (reached ? "text-[#A63D2F]" : "text-[#8A8680]")
                             }
                           >
-                            {t.qty} tee{t.qty === 1 ? "" : "s"}
+                            {t.qty} t-shirt{t.qty === 1 ? "" : "s"}
                           </span>
                         </div>
                       );

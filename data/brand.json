@@ -1,7 +1,7 @@
 {
   "name": "Darro",
   "tagline": "World of a Builder",
-  "shortDescription": "Boxy-fit cotton tees for gym, school, and business. Built in China, worn in Uganda.",
+  "shortDescription": "Boxy-fit cotton t-shirts for gym, school, and business. Built in China, worn in Uganda.",
   "currentSale": {
     "active": true,
     "label": "BLACK FRIDAY 2026",
@@ -12,60 +12,64 @@
   },
   "bfDates": [
     { "date": "Nov 27", "label": "Black Friday Launch" },
-    { "date": "Dec 4",  "label": "Week 2 Drop" },
-    { "date": "Dec 11", "label": "Week 3 Drop" },
-    { "date": "Dec 18", "label": "Week 4 Drop" },
-    { "date": "Dec 25", "label": "Christmas Drop" }
+    { "date": "Dec 4",  "label": "Week 2" },
+    { "date": "Dec 11", "label": "Week 3" },
+    { "date": "Dec 18", "label": "Week 4" },
+    { "date": "Dec 25", "label": "Christmas" }
   ],
   "bundles": [
     {
       "id": "1",
-      "label": "Single Tee",
+      "label": "1 T-shirt",
       "count": 1,
       "priceUGX": 34000,
       "wasPriceUGX": 54000,
       "saveUGX": 20000,
-      "jerseyEntries": 0,
+      "image": "/images/tee-black-front.png",
+      "subtitle": "Boxy fit · pick your color",
       "highlight": false
     },
     {
       "id": "2",
-      "label": "2 Tees",
+      "label": "2 T-shirts",
       "count": 2,
       "priceUGX": 54000,
       "wasPriceUGX": 108000,
       "saveUGX": 54000,
-      "jerseyEntries": 2,
-      "highlight": false
+      "image": "/images/tee-black-ground.png",
+      "subtitle": "Best value · mix colors",
+      "highlight": true
     },
     {
       "id": "3",
-      "label": "3 Tees + Jersey Giveaway",
+      "label": "3 T-shirts",
       "count": 3,
       "priceUGX": 74000,
       "wasPriceUGX": 162000,
       "saveUGX": 88000,
-      "jerseyEntries": 10,
-      "highlight": true
+      "image": "/images/tee-black-side.png",
+      "subtitle": "Maximum savings",
+      "highlight": false
     }
   ],
   "offers": [
-    { "text": "Black Friday — UGX 34,000 a piece instead of 54,000", "href": "/shop" },
-    { "text": "Free delivery around Makerere University", "href": "/shop" },
-    { "text": "Free Jumia delivery on orders over UGX 100,000", "href": "/shop" },
-    { "text": "Refer a friend — both get a free tee on their 2nd order", "href": "/membership" }
+    { "text": "Black Friday — UGX 34,000 · was 54,000", "href": "/shop" },
+    { "text": "2 t-shirts — UGX 54,000 · was 108,000 · save 54K", "href": "/shop" },
+    { "text": "3 t-shirts — UGX 74,000 · was 162,000 · save 88K", "href": "/shop" },
+    { "text": "First 10 buyers get a football jersey free · 10 days only", "href": "/#giveaway" }
   ],
   "jerseyGiveaway": {
     "days": 10,
     "startDate": "2026-11-27",
-    "prizePool": "4 current-season PL/La Liga jerseys + 6 World Cup jerseys",
+    "firstNBuyers": 10,
+    "prizePool": "Arsenal · Manchester United · Chelsea · Argentina World Cup · Portugal World Cup",
     "howToEnter": [
-      "Buy 3 tees — auto-entered for all 10 days (10 entries)",
-      "Buy 2 tees — auto-entered for 2 days",
-      "Join Darro Club on WhatsApp — 1 entry per day you're in the group"
+      "Be one of the first 10 people to buy any t-shirt through darro-ug.vercel.app",
+      "Winners announced in the Darro Club WhatsApp group",
+      "Every order counts — 1 t-shirt or 3, same chance"
     ],
-    "dailyWinner": true,
-    "announcementChannel": "WhatsApp Group"
+    "dailyWinner": false,
+    "announcementChannel": "Darro Club WhatsApp Group"
   },
   "jumia": {
     "enabled": true,
@@ -96,8 +100,7 @@
     "benefits": [
       "Everyday Friday pricing (same as Black Friday, all year)",
       "Early access to Friday drops — 24 hours before everyone else",
-      "Free delivery around Makerere University",
-      "Win a football jersey every week",
+      "First dibs on jersey giveaways",
       "Weekly behind-the-scenes from China"
     ],
     "freeDeliveryZone": "Makerere University",
@@ -117,11 +120,10 @@
   },
   "delivery": {
     "zones": [
-      "Makerere University (free)",
       "Kampala Metropolitan",
       "Nationwide"
     ],
-    "freeZone": "Makerere University",
+    "freeZone": "",
     "timeline": "3-5 working days",
     "feeNote": "Fees based on location — we confirm after order"
   },
