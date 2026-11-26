@@ -315,28 +315,73 @@ export default function CartPage() {
 
         <aside className="lg:col-span-1">
           <div className="sticky top-24 border border-[#E8E4DD] bg-[#F0EDE8] p-6 sm:p-8">
+            {/* --- DAY ONE STYLE CHECKPOINT PROGRESS BAR --- */}
             {(() => {
               const totalQty = items.reduce((s, i) => s + i.quantity, 0);
-              if (totalQty >= 2) {
-                return (
-                  <div className="mb-6 -mx-2 border border-[#A63D2F]/20 bg-[#A63D2F]/5 px-4 py-3">
-                    <p className="text-center text-xs uppercase tracking-[0.18em] font-heading text-[#A63D2F]">
-                      🔥 Bundle &amp; Save · Every extra jersey = −5,000 UGX
-                    </p>
-                    <p className="mt-1 text-center text-[10.5px] text-[#5C5344]">
-                      {totalQty} jerseys · You&apos;re getting −{formatUGX(bundleDiscountUGX)} off
-                    </p>
-                  </div>
-                );
-              }
+              const tiers = [
+                { qty: 1, label: "1 entry — 1 day of draws" },
+                { qty: 2, label: "2 entries — 2 days of draws" },
+                { qty: 3, label: "10 entries — ALL 10 days of draws" },
+              ];
+              const currentTierIndex = Math.min(totalQty, 3); // clamped to 3
+              const nextTier = tiers.find((t) => t.qty > totalQty);
+              const lowest = tiers[0].qty;
+              const highest = tiers[tiers.length - 1].qty;
+              const progress = Math.min(100, Math.max(0, ((totalQty - lowest) / (highest - lowest)) * 100));
+
               return (
-                <div className="mb-6 -mx-2 border border-[#A63D2F]/20 bg-[#A63D2F]/5 px-4 py-3">
-                  <p className="text-center text-xs uppercase tracking-[0.18em] font-heading text-[#A63D2F]">
-                    🔥 Bundle &amp; Save
-                  </p>
-                  <p className="mt-1 text-center text-[10.5px] text-[#5C5344]">
-                    Add 2 jerseys · Save 5,000 UGX · 3 saves 10,000 · 4 saves 15,000
-                  </p>
+                <div className="mb-6 -mx-2 px-4 py-4 border border-[#A63D2F]/20 bg-[#A63D2F]/5 relative">
+                  {/* Main banner text */}
+                  {nextTier ? (
+                    <>
+                      <p className="text-center text-[11px] font-heading uppercase tracking-[0.16em] text-[#A63D2F]">
+                        Add {nextTier.qty - totalQty} more t-shirt{nextTier.qty - totalQty === 1 ? "" : "s"} → {nextTier.label}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-center text-[11px] font-heading uppercase tracking-[0.16em] text-[#2B6B4A]">
+                        ✓ You&apos;re getting {tiers[2].label}
+                      </p>
+                    </>
+                  )}
+
+                  {/* Progress bar with checkpoints */}
+                  <div className="mt-4 relative h-2 bg-[#E8E4DD]">
+                    <div
+                      className="absolute inset-y-0 left-0 bg-[#A63D2F]"
+                      style={{ width: `${Math.max(4, progress)}%` }}
+                    />
+                    {/* Checkpoints */}
+                    {tiers.map((t, idx) => {
+                      const posPct = ((t.qty - lowest) / (highest - lowest)) * 100;
+                      const reached = totalQty >= t.qty;
+                      return (
+                        <div
+                          key={t.qty}
+                          className="absolute top-1/2 -translate-y-1/2"
+                          style={{ left: `calc(${posPct}% - 6px)` }}
+                        >
+                          <div
+                            className={
+                              "w-3 h-3 rounded-full border-2 flex items-center justify-center " +
+                              (reached
+                                ? "bg-[#A63D2F] border-[#A63D2F]"
+                                : "bg-white border-[#8A8680]")
+                            }
+                          />
+                          <span
+                            className={
+                              "absolute top-3 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-mono uppercase tracking-[0.14em] " +
+                              (reached ? "text-[#A63D2F]" : "text-[#8A8680]")
+                            }
+                          >
+                            {t.qty} tee{t.qty === 1 ? "" : "s"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })()}

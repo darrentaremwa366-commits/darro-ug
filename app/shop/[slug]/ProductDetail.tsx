@@ -29,6 +29,9 @@ interface RawProduct {
   fitInfo: string;
   regularPriceUGX: number;
   memberPriceUGX: number;
+  currentPriceUGX?: number;
+  isBFPromo?: boolean;
+  sizeNote?: string;
   sizesAvailable: string[];
   sizesInStock?: string[];
   stockStatus: string;
@@ -218,8 +221,9 @@ export default function ProductDetailClient({
 
             <PriceDisplay
               regularPriceUGX={product.regularPriceUGX}
-              memberPriceUGX={product.memberPriceUGX}
+              memberPriceUGX={product.currentPriceUGX ?? product.memberPriceUGX}
               variant="detail"
+              isBFPromo={product.isBFPromo ?? true}
             />
 
             <div className="pt-1">{stockStatusLine()}</div>
@@ -244,6 +248,11 @@ export default function ProductDetailClient({
             <div className="flex flex-col gap-3 pt-2">
               <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-stone">
                 SIZE
+                {product.sizeNote && (
+                  <span className="normal-case font-body text-[#5C5344] text-[10px] ml-2 tracking-normal normal-case">
+                    ({product.sizeNote})
+                  </span>
+                )}
               </label>
               <SizeSelector
                 sizesAvailable={product.sizesAvailable}
@@ -379,6 +388,24 @@ export default function ProductDetailClient({
               >
                 BUY NOW · ORDER VIA WHATSAPP
               </button>
+
+              {brand.jumia?.enabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = brand.jumia?.link || "#";
+                    if (url === "#") {
+                      alert("Jumia listing coming soon — order via WhatsApp for the same Black Friday price!");
+                    } else {
+                      window.open(url, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                  disabled={soldOut}
+                  className="button-style w-full py-4 border border-[#A63D2F]/60 bg-white text-[#A63D2F] text-[11px] font-heading uppercase tracking-[0.18em] hover:bg-[#A63D2F] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ORDER VIA JUMIA
+                </button>
+              )}
             </div>
 
             <div className="bg-bone border border-bone p-5 mt-6 flex flex-col gap-3">
