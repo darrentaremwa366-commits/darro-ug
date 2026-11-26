@@ -11,45 +11,39 @@
     "priceEnd": "4"
   },
   "bfDates": [
-    { "date": "Nov 27", "label": "Black Friday Launch" },
-    { "date": "Dec 4",  "label": "Week 2" },
-    { "date": "Dec 11", "label": "Week 3" },
-    { "date": "Dec 18", "label": "Week 4" },
-    { "date": "Dec 25", "label": "Christmas" }
+    { "date": "Nov 27" },
+    { "date": "Dec 4" },
+    { "date": "Dec 11" },
+    { "date": "Dec 18" },
+    { "date": "Dec 25" }
   ],
   "bundles": [
     {
       "id": "1",
-      "label": "1 T-shirt",
-      "count": 1,
+      "label": "1 T-SHIRT",
       "priceUGX": 34000,
       "wasPriceUGX": 54000,
       "saveUGX": 20000,
-      "image": "/images/bundle-1-black.png",
-      "subtitle": "Boxy fit · pick your color",
-      "highlight": false
+      "image": "/images/bundle-1-studio.png",
+      "rackImage": "/images/bundle-3-studio.png",
+      "count": 1
     },
     {
       "id": "2",
-      "label": "2 T-shirts",
-      "count": 2,
+      "label": "2 T-SHIRTS",
       "priceUGX": 54000,
       "wasPriceUGX": 108000,
       "saveUGX": 54000,
-      "image": "/images/bundle-2-black.png",
-      "subtitle": "Best value · mix colors",
-      "highlight": true
+      "highlight": true,
+      "count": 2
     },
     {
       "id": "3",
-      "label": "3 T-shirts",
-      "count": 3,
+      "label": "3 T-SHIRTS",
       "priceUGX": 74000,
       "wasPriceUGX": 162000,
       "saveUGX": 88000,
-      "image": "/images/bundle-3-black.png",
-      "subtitle": "Maximum savings",
-      "highlight": false
+      "count": 3
     }
   ],
   "offers": [
@@ -80,14 +74,6 @@
     "link": "",
     "label": "Need Jumia delivery? See listing"
   },
-  "popups": {
-    "giftAmountUGX": 5700,
-    "giftDurationHours": 48,
-    "giftMessage": "You left something in your cart. Here's 5,700 UGX to make it yours. This only happens for 48 hours and it goes.",
-    "scratchCardEnabled": true,
-    "cartAbandonmentTrigger": true,
-    "productPageDelaySec": 0
-  },
   "trustStrip": {
     "left": "World of a Builder",
     "middle": "100% heavyweight cotton",
@@ -103,7 +89,7 @@
       "First dibs on jersey giveaways",
       "Weekly behind-the-scenes from China"
     ],
-    "freeDeliveryZone": "Makerere University",
+    "freeDeliveryZone": "",
     "consentText": "By joining Darro Club you consent to receive occasional WhatsApp messages about new drops and club updates. No spam, ever."
   },
   "uncleStory": "This drop is dedicated to my uncle — the man who taught me to work hard, be a man, travel, and enjoy life. Freedom comes at a cost.",
@@ -119,10 +105,7 @@
     "tiktok": ""
   },
   "delivery": {
-    "zones": [
-      "Kampala Metropolitan",
-      "Nationwide"
-    ],
+    "zones": ["Kampala Metropolitan", "Nationwide"],
     "freeZone": "",
     "timeline": "3-5 working days",
     "feeNote": "Fees based on location — we confirm after order"
