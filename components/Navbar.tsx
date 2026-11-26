@@ -52,18 +52,25 @@ export default function Navbar() {
     <header className="sticky top-0 z-40 w-full bg-[#F7F5F2] border-b border-[#E8E4DD]">
       {/* --- MOVING OFFER STRIP (scrolling left → right to left) --- */}
       <div className="w-full bg-[#0F0F0F] text-[#F7F5F2] overflow-hidden relative">
-        <div className="absolute inset-0 whitespace-nowrap animate-[scroll_40s_linear_infinite]">
-          <span className="inline-block py-2 px-8 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em]">
-            ● {stripText}
-          </span>
-          <span className="inline-block py-2 px-8 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em]" aria-hidden>
-            ● {stripText}
-          </span>
+        <div className="relative whitespace-nowrap overflow-hidden">
+          <div className="banner-track inline-flex whitespace-nowrap">
+            <span className="inline-block py-2 px-8 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em] flex-shrink-0">
+              ● {stripText}
+            </span>
+            <span className="inline-block py-2 px-8 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.18em] flex-shrink-0" aria-hidden>
+              ● {stripText}
+            </span>
+          </div>
         </div>
-        <style jsx>{`
-          @keyframes scroll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
+        <style jsx global>{`
+          @keyframes bannerScroll {
+            from { transform: translateX(0); }
+            to   { transform: translateX(-50%); }
+          }
+          .banner-track {
+            animation: bannerScroll 40s linear infinite;
+            display: inline-flex;
+            width: max-content;
           }
         `}</style>
       </div>
