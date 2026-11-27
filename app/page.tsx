@@ -31,15 +31,15 @@ export default function Home() {
   // --- Pop-up ---
   const [showPopup, setShowPopup] = useState(false);
   useEffect(() => {
-    const KEY = "darro-popup-shown";
+    const KEY = "darro-popup-v2";
     if (typeof window !== "undefined" && !localStorage.getItem(KEY)) {
-      const t = setTimeout(() => setShowPopup(true), 1200);
+      const t = setTimeout(() => setShowPopup(true), 800);
       return () => clearTimeout(t);
     }
   }, []);
   const dismissPopup = () => {
     setShowPopup(false);
-    localStorage.setItem("darro-popup-shown", "1");
+    localStorage.setItem("darro-popup-v2", "1");
   };
 
   // --- Buyer tracker ---
@@ -131,11 +131,21 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 gap-6 md:gap-10 items-start">
             {/* LEFT / TOP: PODIUM IMAGE (responsive) */}
-            <div className="relative bg-[#F5F3EE] border border-[#E8E4DD] overflow-hidden">
-              <picture className="block w-full">
-                <source media="(max-width: 768px)" srcSet="/images/podium-portrait.png" />
-                <Image src="/images/podium-landscape.png" alt="1, 2, and 3 black t-shirt bundles" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-contain bg-[#F5F3EE]" />
-              </picture>
+            <div className="relative aspect-[4/3] md:aspect-[5/4] bg-[#F5F3EE] border border-[#E8E4DD] overflow-hidden">
+              {/* Mobile: portrait stack */}
+              <Image
+                src="/images/podium-portrait.png"
+                alt="1, 2, and 3 black t-shirt bundles"
+                fill sizes="(max-width: 768px) 100vw"
+                className="md:hidden object-cover"
+              />
+              {/* Desktop: landscape */}
+              <Image
+                src="/images/podium-landscape.png"
+                alt="1, 2, and 3 black t-shirt bundles"
+                fill sizes="(min-width: 769px) 50vw"
+                className="hidden md:block object-cover"
+              />
             </div>
 
             {/* RIGHT / BOTTOM: TIER TABLE */}
