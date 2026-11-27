@@ -120,30 +120,75 @@ export default function Home() {
       {/* ============== BLACK FRIDAY PROJECT ============== */}
       <section id="offers" className="w-full bg-[#F5F3EE] border-t border-[#E8E4DD]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-          {/* Title */}
-          <div className="mb-5 sm:mb-6">
-            <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#8A8680]">BLACK FRIDAY 2026</span>
-            <h2 className="mt-1 font-heading uppercase tracking-[0.08em] text-2xl sm:text-4xl text-[#0F0F0F] leading-none">BLACK FRIDAY PROJECT</h2>
-          </div>
+          <div className="grid md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-start">
 
-          {/* Responsive poster image */}
-          <div className="relative aspect-[4/5] md:aspect-[16/9] bg-[#F5F3EE] border border-[#E8E4DD] overflow-hidden">
-            <Image
-              src="/images/bf-poster.png"
-              alt="Black Friday Project — 3 tiers of t-shirt bundles"
-              fill sizes="100vw"
-              className="object-contain bg-[#F5F3EE]"
-              priority
-            />
-          </div>
+            {/* LEFT: poster */}
+            <div className="relative w-full aspect-[4/5] bg-[#EDEAE3] overflow-hidden">
+              <Image
+                src="/images/bf-poster.png"
+                alt="Black Friday Project — 3 tiers of t-shirt bundles"
+                fill sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-contain"
+                priority
+              />
+            </div>
 
-          {/* CTA row */}
-          <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <Link href="/shop" className="w-full sm:w-auto inline-flex items-center justify-center bg-[#0F0F0F] text-[#F5F3EE] px-8 py-3 text-[10px] font-heading uppercase tracking-[0.2em] hover:bg-[#2C2C2C] transition-colors">
-              Shop T-Shirts Now
-            </Link>
-            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#8A8680] text-center sm:text-right">
-              Free delivery · 3–5 working days
+            {/* RIGHT: details */}
+            <div className="pt-0 md:pt-2">
+              <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#A63D2F]">BLACK FRIDAY 2026</span>
+              <h2 className="mt-2 font-heading uppercase tracking-[0.02em] text-[clamp(1.9rem,4.6vw,3.1rem)] leading-[0.92] text-[#0F0F0F]">
+                Black Friday<br className="hidden sm:block" /> Project
+              </h2>
+              <p className="mt-3 font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.16em] text-[#8A8680]">
+                The bigger the bundle, the bigger the save
+              </p>
+
+              {/* Tier rows */}
+              <div className="mt-7 border-t border-[#D8D4CC]">
+                {bundles.map((b, i) => {
+                  const isMid = b.highlight;
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={() => router.push(`/shop/${blackSlug}?add=${b.count}`)}
+                      className="group w-full border-b border-[#D8D4CC] py-4 sm:py-5 text-left flex items-center justify-between gap-4 cursor-pointer hover:bg-[#EDEAE3]/70 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="font-mono text-[10px] tabular-nums text-[#A39C90]">0{i + 1}</span>
+                        <div className="flex flex-col">
+                          <span className="font-heading uppercase tracking-[0.1em] text-[15px] sm:text-base text-[#0F0F0F] leading-none">
+                            {b.label}
+                          </span>
+                          {isMid && (
+                            <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-[#A63D2F]">
+                              ★ Best value
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-heading text-[17px] sm:text-lg tabular-nums text-[#0F0F0F] leading-none">
+                          {formatUGX(b.priceUGX)}
+                        </div>
+                        <div className="mt-1.5 font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.1em] text-[#A39C90]">
+                          <span className="line-through">{formatUGX(b.wasPriceUGX)}</span>
+                          <span className="text-[#A63D2F]"> · save {formatUGX(b.saveUGX)}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* CTA */}
+              <div className="mt-7 flex flex-col sm:flex-row sm:items-center gap-4">
+                <Link href="/shop" className="inline-flex items-center justify-center bg-[#0F0F0F] text-[#F5F3EE] px-8 py-3.5 text-[10px] font-heading uppercase tracking-[0.2em] hover:bg-[#2C2C2C] transition-colors">
+                  Shop All
+                </Link>
+                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#8A8680]">
+                  Free delivery · 3–5 working days
+                </span>
+              </div>
             </div>
           </div>
         </div>
