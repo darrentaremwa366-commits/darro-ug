@@ -98,7 +98,7 @@ export default function Home() {
       {/* ============== HERO ============== */}
       <section className="relative w-full bg-[#0F0F0F] overflow-hidden">
         <picture className="absolute inset-0">
-          <source media="(max-width: 768px)" srcSet="/images/tee-black-front.png" />
+          <source media="(max-width: 768px)" srcSet="/images/tee-black-front.jpg" />
           <Image src="/images/hero-beach.jpg" alt="DARRO — World of a Builder" fill priority sizes="100vw" className="object-cover object-center md:object-top brightness-[0.65] contrast-[1.05]" />
         </picture>
         <div className="absolute inset-0 bg-gradient-to-b from-[#0F0F0F]/40 via-[#0F0F0F]/20 to-[#0F0F0F]/85" />
@@ -117,106 +117,50 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============== BLACK FRIDAY PROJECT (Tim Psychotic style) ============== */}
+      {/* ============== BLACK FRIDAY PROJECT ============== */}
       <section id="offers" className="w-full bg-[#F5F3EE] border-t border-[#E8E4DD]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-          {/* Title — "BLACK FRIDAY PROJECT" is BIGGER */}
-          <div className="mb-6 sm:mb-8">
+          {/* Title */}
+          <div className="mb-5 sm:mb-6">
             <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#8A8680]">BLACK FRIDAY 2026</span>
             <h2 className="mt-1 font-heading uppercase tracking-[0.08em] text-2xl sm:text-4xl text-[#0F0F0F] leading-none">BLACK FRIDAY PROJECT</h2>
-            <p className="mt-2 text-[12px] sm:text-[13px] text-[#5C5344]">
-              The bigger the bundle, the bigger the save. Prices valid on Black Friday drop days only — Nov 27 through Dec 25.
-            </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 md:gap-10 items-start">
-            {/* LEFT / TOP: PODIUM IMAGE (responsive) */}
-            <div className="relative aspect-[4/3] md:aspect-[5/4] bg-[#F5F3EE] border border-[#E8E4DD] overflow-hidden">
-              {/* Mobile: portrait stack */}
-              <Image
-                src="/images/podium-portrait.png"
-                alt="1, 2, and 3 black t-shirt bundles"
-                fill sizes="(max-width: 768px) 100vw"
-                className="md:hidden object-cover"
-              />
-              {/* Desktop: landscape */}
-              <Image
-                src="/images/podium-landscape.png"
-                alt="1, 2, and 3 black t-shirt bundles"
-                fill sizes="(min-width: 769px) 50vw"
-                className="hidden md:block object-cover"
-              />
-            </div>
+          {/* Responsive poster image */}
+          <div className="relative aspect-[4/5] md:aspect-[16/9] bg-[#F5F3EE] border border-[#E8E4DD] overflow-hidden">
+            <Image
+              src="/images/bf-poster.png"
+              alt="Black Friday Project — 3 tiers of t-shirt bundles"
+              fill sizes="100vw"
+              className="object-contain bg-[#F5F3EE]"
+              priority
+            />
+          </div>
 
-            {/* RIGHT / BOTTOM: TIER TABLE */}
-            <div className="flex flex-col">
-              {/* Header row */}
-              <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 px-1 py-2 text-[9px] font-mono uppercase tracking-[0.22em] text-[#8A8680] border-b border-[#0F0F0F]">
-                <span className="w-16 sm:w-20">QUANTITY</span>
-                <span className="hidden sm:block text-center">—</span>
-                <span className="text-right">PRICE</span>
-                <span className="text-right">SAVE</span>
-              </div>
-
-              {bundles.map((b) => {
-                const isMid = b.highlight;
-                return (
-                  <button
-                    key={b.id}
-                    onClick={() => router.push(`/shop/${blackSlug}?add=${b.count}`)}
-                    className={
-                      "grid grid-cols-[auto_1fr_auto_auto] gap-3 items-center px-1 py-3 border-b border-[#E8E4DD] text-left transition-colors cursor-pointer " +
-                      (isMid ? "bg-[#0F0F0F] text-[#F5F3EE]" : "hover:bg-[#E8E4DD]/40")
-                    }
-                  >
-                    <span className={"font-heading uppercase tracking-[0.12em] text-sm w-16 sm:w-20 " + (isMid ? "text-[#F5F3EE]" : "text-[#0F0F0F]")}>
-                      {b.label}
-                    </span>
-                    <span className={"hidden sm:flex text-[10px] font-mono uppercase tracking-[0.14em] items-center gap-2 " + (isMid ? "text-[#FFCC00]" : "text-[#8A8680]")}>
-                      {isMid && "★ BEST VALUE"}
-                    </span>
-                    <span className={"text-right font-heading text-base sm:text-lg tabular-nums " + (isMid ? "text-[#F5F3EE]" : "text-[#0F0F0F]")}>
-                      {formatUGX(b.priceUGX)}
-                    </span>
-                    <span className={"text-right " + (isMid ? "text-[#FFCC00]" : "text-[#A63D2F]")}>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.14em] line-through block sm:inline opacity-60 mr-1">
-                        {formatUGX(b.wasPriceUGX).replace("UGX ", "")}
-                      </span>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                        Save {formatUGX(b.saveUGX).replace("UGX ", "")}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-
-              <div className="pt-4 flex flex-col gap-3">
-                <Link href="/shop" className="w-full py-3 bg-[#0F0F0F] text-[#F5F3EE] text-[10px] font-heading uppercase tracking-[0.2em] text-center hover:bg-[#2C2C2C] transition-colors">
-                  Shop T-Shirts Now
-                </Link>
-                <div className="text-center font-mono text-[9px] uppercase tracking-[0.18em] text-[#8A8680]">
-                  Free delivery · 3-5 working days
-                </div>
-              </div>
+          {/* CTA row */}
+          <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <Link href="/shop" className="w-full sm:w-auto inline-flex items-center justify-center bg-[#0F0F0F] text-[#F5F3EE] px-8 py-3 text-[10px] font-heading uppercase tracking-[0.2em] hover:bg-[#2C2C2C] transition-colors">
+              Shop T-Shirts Now
+            </Link>
+            <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#8A8680] text-center sm:text-right">
+              Free delivery · 3–5 working days
             </div>
           </div>
         </div>
       </section>
 
-      {/* ============== DROP CALENDAR (small actual calendar) ============== */}
+      {/* ============== DROP CALENDAR ============== */}
       <section className="w-full bg-[#F5F3EE] border-t border-[#E8E4DD]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <div className="grid md:grid-cols-[auto_1fr] gap-6 md:gap-10 items-start">
-            {/* Sentence */}
             <div>
               <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-[#8A8680]">BLACK FRIDAY 2026</span>
               <h2 className="mt-1 font-heading uppercase tracking-[0.14em] text-base sm:text-lg text-[#0F0F0F]">Drop Calendar</h2>
               <p className="mt-2 text-[12px] text-[#5C5344] max-w-xs leading-relaxed">
-                BF prices are valid on <span className="font-heading text-[#0F0F0F]">drop days only</span> — Nov 27 through Dec 25.
+                Black Friday prices on <span className="font-heading text-[#0F0F0F]">drop days only</span> — Nov 27 through Dec 25.
                 <br />Other days → regular pricing.
               </p>
             </div>
-            {/* Small calendar grid — 5 cells */}
             <div className="bg-white border border-[#E8E4DD] p-4">
               <div className="grid grid-cols-5 gap-2 text-center">
                 {bfDates.map((d, i) => {
@@ -225,38 +169,23 @@ export default function Home() {
                   return (
                     <div key={d.date} className={
                       "flex flex-col items-center gap-1 py-2 px-1 border " +
-                      (isLive
-                        ? "border-[#0F0F0F] bg-[#0F0F0F] text-[#F5F3EE]"
-                        : "border-[#E8E4DD] bg-[#F5F3EE] text-[#0F0F0F]")
+                      (isLive ? "border-[#0F0F0F] bg-[#0F0F0F] text-[#F5F3EE]" : "border-[#E8E4DD] bg-[#F5F3EE] text-[#0F0F0F]")
                     }>
-                      <span className={"font-mono text-[8px] uppercase tracking-[0.2em] " + (isLive ? "text-white/60" : "text-[#8A8680]")}>
-                        Fri
-                      </span>
-                      <span className="font-heading text-[13px] sm:text-sm leading-tight">
-                        {parts[0]}
-                      </span>
-                      <span className={"font-heading text-[15px] sm:text-lg leading-none " + (isLive ? "text-[#FFCC00]" : "")}>
-                        {parts[1]}
-                      </span>
+                      <span className={"font-mono text-[8px] uppercase tracking-[0.2em] " + (isLive ? "text-white/60" : "text-[#8A8680]")}>Fri</span>
+                      <span className="font-heading text-[13px] sm:text-sm leading-tight">{parts[0]}</span>
+                      <span className={"font-heading text-[15px] sm:text-lg leading-none " + (isLive ? "text-[#FFCC00]" : "")}>{parts[1]}</span>
                     </div>
                   );
                 })}
               </div>
               <div className="mt-3 flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.14em] text-[#8A8680]">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 bg-[#0F0F0F]" />
-                  LIVE NOW
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 border border-[#E8E4DD] bg-[#F5F3EE]" />
-                  UPCOMING
-                </div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#0F0F0F]" />LIVE NOW</div>
+                <div className="flex items-center gap-1.5"><div className="w-3 h-3 border border-[#E8E4DD] bg-[#F5F3EE]" />UPCOMING</div>
               </div>
             </div>
           </div>
         </div>
       </section>
-
       {/* ============== BOXY T-SHIRTS GRID ============== */}
       <section className="w-full bg-[#F5F3EE] border-t border-[#E8E4DD]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">

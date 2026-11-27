@@ -25,11 +25,11 @@
     "lowStockBanner": null,
     "sizeNote": "Size S (Chinese) — fits US Medium on average adults. Wide across shoulders, hits at belt line.",
     "fitNote": "Boxy, not cropped. Hits at the belt line, wide across shoulders.",
-    "shippingNote": "3–5 working days nationwide · Free around Makerere University",
+    "shippingNote": "3–5 working days nationwide",
     "images": [
-      "/images/tee-black-front.png",
-      "/images/tee-black-side.png",
-      "/images/tee-black-ground.png"
+      "/images/tee-black-front.jpg",
+      "/images/tee-black-back.jpg",
+      "/images/tee-black-side.jpg"
     ],
     "unitsSold": 0,
     "reviewsCount": 0,
@@ -64,11 +64,11 @@
     "lowStockBanner": "Only 3 Gray left",
     "sizeNote": "Size S (Chinese) — fits US Medium on average adults. Wide across shoulders, hits at belt line.",
     "fitNote": "Boxy, not cropped. Hits at the belt line, wide across shoulders.",
-    "shippingNote": "3–5 working days nationwide · Free around Makerere University",
+    "shippingNote": "3–5 working days nationwide",
     "images": [
-      "/images/tee-gray-front.png",
-      "/images/tee-gray-side.png",
-      "/images/tee-gray-ground.png"
+      "/images/tee-gray-front.jpg",
+      "/images/tee-gray-back.jpg",
+      "/images/tee-gray-side.jpg"
     ],
     "unitsSold": 0,
     "reviewsCount": 0,
@@ -100,14 +100,14 @@
     "isBestSeller": false,
     "bestSeller": false,
     "lowStock": true,
-    "lowStockBanner": "Last 1 White — gone by Friday",
+    "lowStockBanner": "Last 1 White",
     "sizeNote": "Size S (Chinese) — fits US Medium on average adults. Wide across shoulders, hits at belt line.",
     "fitNote": "Boxy, not cropped. Hits at the belt line, wide across shoulders.",
-    "shippingNote": "3–5 working days nationwide · Free around Makerere University",
+    "shippingNote": "3–5 working days nationwide",
     "images": [
-      "/images/tee-white-front.png",
-      "/images/tee-white-side.png",
-      "/images/tee-white-ground.png"
+      "/images/tee-white-front.jpg",
+      "/images/tee-white-back.jpg",
+      "/images/tee-white-side.jpg"
     ],
     "unitsSold": 0,
     "reviewsCount": 0,
